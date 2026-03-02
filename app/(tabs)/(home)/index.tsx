@@ -15,10 +15,11 @@ import * as Haptics from "expo-haptics";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PLAYER_SIZE = 40;
 const OBSTACLE_WIDTH = 60;
-const OBSTACLE_GAP = 200;
-const GAME_SPEED = 3;
-const GRAVITY = 0.6;
-const JUMP_FORCE = -12;
+const OBSTACLE_GAP = 220;
+const GAME_SPEED = 1.8;
+const GRAVITY = 0.35;
+const JUMP_FORCE = -8;
+const BOUNDARY_PADDING = 20;
 
 interface Obstacle {
   id: number;
@@ -52,13 +53,13 @@ export default function HomeScreen() {
   const flipGravity = () => {
     if (!gameStarted || gameOver) return;
     
-    console.log("User tapped to flip gravity");
+    console.log("User tapped to flip gravity - immediate shift");
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
     gravityDirection.current *= -1;
-    playerVelocity.current = JUMP_FORCE * gravityDirection.current;
+    playerVelocity.current = 0;
   };
 
   const startGame = () => {
@@ -105,10 +106,6 @@ export default function HomeScreen() {
       }
     }
 
-    if (playerTop < 0 || playerBottom > SCREEN_HEIGHT) {
-      return true;
-    }
-
     return false;
   };
 
@@ -117,7 +114,21 @@ export default function HomeScreen() {
 
     gameLoopRef.current = setInterval(() => {
       playerVelocity.current += GRAVITY * gravityDirection.current;
-      const newPlayerY = playerY.value + playerVelocity.current;
+      let newPlayerY = playerY.value + playerVelocity.current;
+
+      const minY = BOUNDARY_PADDING;
+      const maxY = SCREEN_HEIGHT - PLAYER_SIZE - BOUNDARY_PADDING;
+
+      if (newPlayerY < minY) {
+        newPlayerY = minY;
+        playerVelocity.current = 0;
+        console.log("Player hit roof - sliding along boundary");
+      } else if (newPlayerY > maxY) {
+        newPlayerY = maxY;
+        playerVelocity.current = 0;
+        console.log("Player hit floor - sliding along boundary");
+      }
+
       playerY.value = newPlayerY;
 
       setObstacles((prevObstacles) => {
@@ -136,8 +147,10 @@ export default function HomeScreen() {
         });
 
         const lastObstacle = newObstacles[newObstacles.length - 1];
-        if (!lastObstacle || lastObstacle.x < SCREEN_WIDTH - 300) {
-          const gapY = Math.random() * (SCREEN_HEIGHT - OBSTACLE_GAP - 100) + 50;
+        if (!lastObstacle || lastObstacle.x < SCREEN_WIDTH - 350) {
+          const minGapY = BOUNDARY_PADDING + 80;
+          const maxGapY = SCREEN_HEIGHT - OBSTACLE_GAP - BOUNDARY_PADDING - 80;
+          const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
           newObstacles.push({
             id: obstacleCounter.current++,
             x: SCREEN_WIDTH,
@@ -168,6 +181,7 @@ export default function HomeScreen() {
   const textColor = isDark ? '#ffffff' : '#1e293b';
   const buttonBg = isDark ? '#1e40af' : '#3b82f6';
   const buttonText = '#ffffff';
+  const boundaryColor = isDark ? '#374151' : '#cbd5e1';
 
   const scoreText = `${score}`;
   const gameOverText = 'Game Over!';
@@ -181,6 +195,13 @@ export default function HomeScreen() {
       style={[styles.container, { backgroundColor }]}
       onPress={flipGravity}
     >
+      {gameStarted && !gameOver && (
+        <>
+          <View style={[styles.boundary, styles.topBoundary, { backgroundColor: boundaryColor }]} />
+          <View style={[styles.boundary, styles.bottomBoundary, { backgroundColor: boundaryColor }]} />
+        </>
+      )}
+
       {gameStarted && !gameOver && (
         <View style={styles.scoreContainer}>
           <Text style={[styles.scoreText, { color: textColor }]}>{scoreText}</Text>
@@ -286,6 +307,18 @@ const styles = StyleSheet.create({
     top: 0,
   },
   bottomObstacle: {},
+  boundary: {
+    position: 'absolute',
+    width: '100%',
+    height: 3,
+    zIndex: 5,
+  },
+  topBoundary: {
+    top: BOUNDARY_PADDING,
+  },
+  bottomBoundary: {
+    bottom: BOUNDARY_PADDING,
+  },
   menuContainer: {
     flex: 1,
     justifyContent: 'center',
