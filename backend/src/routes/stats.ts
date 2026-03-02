@@ -46,7 +46,7 @@ export function registerStatsRoutes(app: App, fastify: FastifyInstance) {
         const created = await app.db.insert(schema.userStats).values({
           userId: session.user.id,
           highScore: 0,
-          totalCoins: 0,
+          totalCoins: 50000, // Starting coins: R500
           weeklyScore: 0,
         }).returning();
         userStats = created[0];

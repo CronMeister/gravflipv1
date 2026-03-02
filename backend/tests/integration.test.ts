@@ -14,6 +14,18 @@ describe("API Integration Tests", () => {
     expect(authToken).toBeDefined();
   });
 
+  // ============ Store - Seed (Public) ============
+  test("Seed store items", async () => {
+    const res = await api("/api/store/seed", {
+      method: "POST",
+    });
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.created).toBeDefined();
+    expect(data.total).toBeDefined();
+    expect(data.message).toBeDefined();
+  });
+
   // ============ Store - Items (Public) ============
   test("Get all store items", async () => {
     const res = await api("/api/store/items");
