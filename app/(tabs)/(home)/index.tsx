@@ -24,6 +24,11 @@ const OBSTACLE_SPAWN_DISTANCE = 400;
 const FLOATING_OBSTACLE_SIZE = 50;
 const FLOATING_OBSTACLE_SPAWN_DISTANCE = 180;
 
+// Progressive difficulty constants
+const MIN_FULL_OBSTACLE_DISTANCE = 280;
+const MIN_FLOATING_OBSTACLE_DISTANCE = 140;
+const DIFFICULTY_INCREASE_RATE = 0.015;
+
 interface Obstacle {
   id: number;
   x: number;
@@ -160,20 +165,39 @@ export default function HomeScreen() {
 
         newObstacles = newObstacles.filter((obs) => obs.x > -OBSTACLE_WIDTH);
 
+        let currentScore = 0;
         newObstacles.forEach((obs) => {
           if (!obs.passed && obs.x + OBSTACLE_WIDTH < 50) {
             obs.passed = true;
-            runOnJS(setScore)((s) => s + 1);
+            currentScore++;
           }
         });
+        
+        if (currentScore > 0) {
+          runOnJS(setScore)((s) => {
+            const newScore = s + currentScore;
+            console.log("Score increased to:", newScore);
+            return newScore;
+          });
+        }
+
+        const difficultyMultiplier = Math.max(0, 1 - (score * DIFFICULTY_INCREASE_RATE));
+        const currentFullObstacleDistance = Math.max(
+          MIN_FULL_OBSTACLE_DISTANCE,
+          OBSTACLE_SPAWN_DISTANCE * difficultyMultiplier
+        );
+        const currentFloatingObstacleDistance = Math.max(
+          MIN_FLOATING_OBSTACLE_DISTANCE,
+          FLOATING_OBSTACLE_SPAWN_DISTANCE * difficultyMultiplier
+        );
 
         const lastObstacle = newObstacles[newObstacles.length - 1];
         const shouldSpawnFullObstacle = !lastObstacle || 
-          (lastObstacle.type === 'full' && lastObstacle.x < SCREEN_WIDTH - OBSTACLE_SPAWN_DISTANCE) ||
-          (lastObstacle.type === 'floating' && lastObstacle.x < SCREEN_WIDTH - OBSTACLE_SPAWN_DISTANCE);
+          (lastObstacle.type === 'full' && lastObstacle.x < SCREEN_WIDTH - currentFullObstacleDistance) ||
+          (lastObstacle.type === 'floating' && lastObstacle.x < SCREEN_WIDTH - currentFullObstacleDistance);
         
         const shouldSpawnFloatingObstacle = !lastObstacle || 
-          lastObstacle.x < SCREEN_WIDTH - FLOATING_OBSTACLE_SPAWN_DISTANCE;
+          lastObstacle.x < SCREEN_WIDTH - currentFloatingObstacleDistance;
 
         if (shouldSpawnFloatingObstacle) {
           const randomChoice = Math.random();
@@ -191,7 +215,7 @@ export default function HomeScreen() {
               passed: false,
               type: 'floating',
             });
-            console.log("Spawned floating obstacle at Y:", floatingY);
+            console.log("Spawned floating obstacle at Y:", floatingY, "- Difficulty:", difficultyMultiplier.toFixed(2));
           } else if (shouldSpawnFullObstacle) {
             const minGapY = BOUNDARY_PADDING + 80;
             const maxGapY = SCREEN_HEIGHT - OBSTACLE_GAP - BOUNDARY_PADDING - 80;
@@ -203,7 +227,7 @@ export default function HomeScreen() {
               passed: false,
               type: 'full',
             });
-            console.log("Spawned full obstacle with gap at Y:", gapY);
+            console.log("Spawned full obstacle with gap at Y:", gapY, "- Difficulty:", difficultyMultiplier.toFixed(2));
           }
         }
 
@@ -220,7 +244,7 @@ export default function HomeScreen() {
         clearInterval(gameLoopRef.current);
       }
     };
-  }, [gameStarted, gameOver]);
+  }, [gameStarted, gameOver, score]);
 
   const isDark = theme.dark;
   const backgroundColor = isDark ? '#0a0a0f' : '#e0f2ff';
