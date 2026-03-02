@@ -20,13 +20,17 @@ const GAME_SPEED = 1.8;
 const GRAVITY = 0.35;
 const JUMP_FORCE = -8;
 const BOUNDARY_PADDING = 20;
-const OBSTACLE_SPAWN_DISTANCE = 200;
+const OBSTACLE_SPAWN_DISTANCE = 400;
+const FLOATING_OBSTACLE_SIZE = 50;
+const FLOATING_OBSTACLE_SPAWN_DISTANCE = 180;
 
 interface Obstacle {
   id: number;
   x: number;
   gapY: number;
   passed: boolean;
+  type: 'full' | 'floating';
+  floatingY?: number;
 }
 
 export default function HomeScreen() {
@@ -97,12 +101,28 @@ export default function HomeScreen() {
       const obstacleLeft = obstacle.x;
       const obstacleRight = obstacle.x + OBSTACLE_WIDTH;
 
-      if (playerRight > obstacleLeft && playerLeft < obstacleRight) {
-        const topObstacleBottom = obstacle.gapY;
-        const bottomObstacleTop = obstacle.gapY + OBSTACLE_GAP;
+      if (obstacle.type === 'floating' && obstacle.floatingY !== undefined) {
+        const floatingLeft = obstacle.x;
+        const floatingRight = obstacle.x + FLOATING_OBSTACLE_SIZE;
+        const floatingTop = obstacle.floatingY;
+        const floatingBottom = obstacle.floatingY + FLOATING_OBSTACLE_SIZE;
 
-        if (playerTop < topObstacleBottom || playerBottom > bottomObstacleTop) {
+        if (
+          playerRight > floatingLeft &&
+          playerLeft < floatingRight &&
+          playerBottom > floatingTop &&
+          playerTop < floatingBottom
+        ) {
           return true;
+        }
+      } else {
+        if (playerRight > obstacleLeft && playerLeft < obstacleRight) {
+          const topObstacleBottom = obstacle.gapY;
+          const bottomObstacleTop = obstacle.gapY + OBSTACLE_GAP;
+
+          if (playerTop < topObstacleBottom || playerBottom > bottomObstacleTop) {
+            return true;
+          }
         }
       }
     }
@@ -148,16 +168,43 @@ export default function HomeScreen() {
         });
 
         const lastObstacle = newObstacles[newObstacles.length - 1];
-        if (!lastObstacle || lastObstacle.x < SCREEN_WIDTH - OBSTACLE_SPAWN_DISTANCE) {
-          const minGapY = BOUNDARY_PADDING + 80;
-          const maxGapY = SCREEN_HEIGHT - OBSTACLE_GAP - BOUNDARY_PADDING - 80;
-          const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
-          newObstacles.push({
-            id: obstacleCounter.current++,
-            x: SCREEN_WIDTH,
-            gapY,
-            passed: false,
-          });
+        const shouldSpawnFullObstacle = !lastObstacle || 
+          (lastObstacle.type === 'full' && lastObstacle.x < SCREEN_WIDTH - OBSTACLE_SPAWN_DISTANCE) ||
+          (lastObstacle.type === 'floating' && lastObstacle.x < SCREEN_WIDTH - OBSTACLE_SPAWN_DISTANCE);
+        
+        const shouldSpawnFloatingObstacle = !lastObstacle || 
+          lastObstacle.x < SCREEN_WIDTH - FLOATING_OBSTACLE_SPAWN_DISTANCE;
+
+        if (shouldSpawnFloatingObstacle) {
+          const randomChoice = Math.random();
+          
+          if (randomChoice < 0.7) {
+            const minFloatingY = BOUNDARY_PADDING + 60;
+            const maxFloatingY = SCREEN_HEIGHT - BOUNDARY_PADDING - FLOATING_OBSTACLE_SIZE - 60;
+            const floatingY = Math.random() * (maxFloatingY - minFloatingY) + minFloatingY;
+            
+            newObstacles.push({
+              id: obstacleCounter.current++,
+              x: SCREEN_WIDTH,
+              gapY: 0,
+              floatingY,
+              passed: false,
+              type: 'floating',
+            });
+            console.log("Spawned floating obstacle at Y:", floatingY);
+          } else if (shouldSpawnFullObstacle) {
+            const minGapY = BOUNDARY_PADDING + 80;
+            const maxGapY = SCREEN_HEIGHT - OBSTACLE_GAP - BOUNDARY_PADDING - 80;
+            const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
+            newObstacles.push({
+              id: obstacleCounter.current++,
+              x: SCREEN_WIDTH,
+              gapY,
+              passed: false,
+              type: 'full',
+            });
+            console.log("Spawned full obstacle with gap at Y:", gapY);
+          }
         }
 
         if (checkCollision(newPlayerY, newObstacles)) {
@@ -179,6 +226,7 @@ export default function HomeScreen() {
   const backgroundColor = isDark ? '#0a0a0f' : '#e0f2ff';
   const playerColor = '#f59e0b';
   const obstacleColor = isDark ? '#dc2626' : '#ef4444';
+  const floatingObstacleColor = isDark ? '#7c3aed' : '#a855f7';
   const textColor = isDark ? '#ffffff' : '#1e293b';
   const buttonBg = isDark ? '#1e40af' : '#3b82f6';
   const buttonText = '#ffffff';
@@ -225,29 +273,46 @@ export default function HomeScreen() {
 
           {obstacles.map((obstacle) => (
             <React.Fragment key={obstacle.id}>
-              <View
-                style={[
-                  styles.obstacle,
-                  styles.topObstacle,
-                  {
-                    backgroundColor: obstacleColor,
-                    left: obstacle.x,
-                    height: obstacle.gapY,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.obstacle,
-                  styles.bottomObstacle,
-                  {
-                    backgroundColor: obstacleColor,
-                    left: obstacle.x,
-                    top: obstacle.gapY + OBSTACLE_GAP,
-                    height: SCREEN_HEIGHT - (obstacle.gapY + OBSTACLE_GAP),
-                  },
-                ]}
-              />
+              {obstacle.type === 'floating' && obstacle.floatingY !== undefined ? (
+                <View
+                  style={[
+                    styles.floatingObstacle,
+                    {
+                      backgroundColor: floatingObstacleColor,
+                      left: obstacle.x,
+                      top: obstacle.floatingY,
+                      width: FLOATING_OBSTACLE_SIZE,
+                      height: FLOATING_OBSTACLE_SIZE,
+                    },
+                  ]}
+                />
+              ) : (
+                <>
+                  <View
+                    style={[
+                      styles.obstacle,
+                      styles.topObstacle,
+                      {
+                        backgroundColor: obstacleColor,
+                        left: obstacle.x,
+                        height: obstacle.gapY,
+                      },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.obstacle,
+                      styles.bottomObstacle,
+                      {
+                        backgroundColor: obstacleColor,
+                        left: obstacle.x,
+                        top: obstacle.gapY + OBSTACLE_GAP,
+                        height: SCREEN_HEIGHT - (obstacle.gapY + OBSTACLE_GAP),
+                      },
+                    ]}
+                  />
+                </>
+              )}
             </React.Fragment>
           ))}
         </>
@@ -312,6 +377,10 @@ const styles = StyleSheet.create({
     top: 0,
   },
   bottomObstacle: {},
+  floatingObstacle: {
+    position: 'absolute',
+    borderRadius: 8,
+  },
   greyedOutArea: {
     position: 'absolute',
     width: '100%',
