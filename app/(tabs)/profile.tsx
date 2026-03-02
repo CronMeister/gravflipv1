@@ -1,12 +1,98 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/IconSymbol";
 import { GlassView } from "expo-glass-effect";
 import { useTheme } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { useAuth } from "@/contexts/AuthContext";
+import { authenticatedGet } from "@/utils/api";
+
+interface UserStats {
+  highScore: number;
+  totalCoins: number;
+  weeklyScore: number;
+}
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const router = useRouter();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      loadStats();
+    } else {
+      setStats(null);
+    }
+  }, [user]);
+
+  const loadStats = async () => {
+    console.log('[API] Loading user stats for profile...');
+    try {
+      setStatsLoading(true);
+      const data = await authenticatedGet<UserStats>('/api/stats');
+      console.log('[API] Profile stats loaded:', data);
+      setStats(data);
+    } catch (error) {
+      console.error('[API] Error loading profile stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true);
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[
+            styles.contentContainer,
+            Platform.OS !== 'ios' && styles.contentContainerWithTabBar
+          ]}
+        >
+          <GlassView style={[
+            styles.profileHeader,
+            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+          ]} glassEffectStyle="regular">
+            <IconSymbol ios_icon_name="person.circle.fill" android_material_icon_name="person" size={80} color={theme.dark ? '#98989D' : '#ccc'} />
+            <Text style={[styles.name, { color: theme.colors.text }]}>Guest</Text>
+            <Text style={[styles.email, { color: theme.dark ? '#98989D' : '#666' }]}>Sign in to track your progress</Text>
+          </GlassView>
+
+          <TouchableOpacity
+            style={[styles.signInButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => router.push('/auth')}
+          >
+            <IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={20} color="#fff" />
+            <Text style={styles.signInButtonText}>Sign In / Create Account</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -22,23 +108,54 @@ export default function ProfileScreen() {
           Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
         ]} glassEffectStyle="regular">
           <IconSymbol ios_icon_name="person.circle.fill" android_material_icon_name="person" size={80} color={theme.colors.primary} />
-          <Text style={[styles.name, { color: theme.colors.text }]}>John Doe</Text>
-          <Text style={[styles.email, { color: theme.dark ? '#98989D' : '#666' }]}>john.doe@example.com</Text>
+          <Text style={[styles.name, { color: theme.colors.text }]}>{user.name || 'Player'}</Text>
+          <Text style={[styles.email, { color: theme.dark ? '#98989D' : '#666' }]}>{user.email}</Text>
         </GlassView>
 
-        <GlassView style={[
-          styles.section,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          <View style={styles.infoRow}>
-            <IconSymbol ios_icon_name="phone.fill" android_material_icon_name="phone" size={20} color={theme.dark ? '#98989D' : '#666'} />
-            <Text style={[styles.infoText, { color: theme.colors.text }]}>+1 (555) 123-4567</Text>
+        {statsLoading ? (
+          <View style={styles.statsLoadingContainer}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
           </View>
-          <View style={styles.infoRow}>
-            <IconSymbol ios_icon_name="location.fill" android_material_icon_name="location-on" size={20} color={theme.dark ? '#98989D' : '#666'} />
-            <Text style={[styles.infoText, { color: theme.colors.text }]}>San Francisco, CA</Text>
-          </View>
-        </GlassView>
+        ) : stats ? (
+          <GlassView style={[
+            styles.statsSection,
+            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+          ]} glassEffectStyle="regular">
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Your Stats</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="star" size={28} color="#FFD700" />
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.highScore}</Text>
+                <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>High Score</Text>
+              </View>
+              <View style={styles.statItem}>
+                <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={28} color="#FFD700" />
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.totalCoins}</Text>
+                <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>Total Coins</Text>
+              </View>
+              <View style={styles.statItem}>
+                <IconSymbol ios_icon_name="chart.bar.fill" android_material_icon_name="leaderboard" size={28} color={theme.colors.primary} />
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.weeklyScore}</Text>
+                <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>Weekly Score</Text>
+              </View>
+            </View>
+          </GlassView>
+        ) : null}
+
+        <TouchableOpacity
+          style={[styles.signOutButton, { backgroundColor: theme.dark ? '#1c1c1e' : '#f1f5f9' }]}
+          onPress={handleSignOut}
+          disabled={signingOut}
+        >
+          {signingOut ? (
+            <ActivityIndicator size="small" color="#ef4444" />
+          ) : (
+            <>
+              <IconSymbol ios_icon_name="rectangle.portrait.and.arrow.right" android_material_icon_name="logout" size={20} color="#ef4444" />
+              <Text style={styles.signOutButtonText}>Sign Out</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -47,7 +164,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    // backgroundColor handled dynamically
   },
   container: {
     flex: 1,
@@ -56,7 +172,16 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   contentContainerWithTabBar: {
-    paddingBottom: 100, // Extra padding for floating tab bar
+    paddingBottom: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsLoadingContainer: {
+    padding: 20,
+    alignItems: 'center',
   },
   profileHeader: {
     alignItems: 'center',
@@ -68,24 +193,62 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    // color handled dynamically
   },
   email: {
     fontSize: 16,
-    // color handled dynamically
   },
-  section: {
+  statsSection: {
     borderRadius: 12,
     padding: 20,
-    gap: 12,
+    marginBottom: 16,
   },
-  infoRow: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  signInButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    gap: 10,
+    marginTop: 8,
   },
-  infoText: {
+  signInButtonText: {
+    color: '#fff',
     fontSize: 16,
-    // color handled dynamically
+    fontWeight: '600',
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    gap: 10,
+    marginTop: 8,
+  },
+  signOutButtonText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

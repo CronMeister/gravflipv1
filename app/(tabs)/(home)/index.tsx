@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, ScrollView } from "react-native";
 import { useTheme } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,6 +12,10 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { IconSymbol } from "@/components/IconSymbol";
+import { GlassView } from "expo-glass-effect";
+import { apiGet, authenticatedGet, authenticatedPost } from "@/utils/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PLAYER_SIZE = 40;
@@ -53,12 +58,27 @@ interface Obstacle {
   wallGapX?: number;
 }
 
+interface DailyObjective {
+  id: string;
+  title: string;
+  description: string;
+  targetValue: number;
+  rewardCoins: number;
+  icon: string;
+  progress: number;
+  completed: boolean;
+}
+
 export default function HomeScreen() {
   const theme = useTheme();
+  const router = useRouter();
+  const { user } = useAuth();
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [highScore, setHighScore] = useState(0);
+  const [dailyObjectives, setDailyObjectives] = useState<DailyObjective[]>([]);
   
   const playerY = useSharedValue(SCREEN_HEIGHT / 2);
   const playerVelocity = useRef(0);
@@ -75,6 +95,60 @@ export default function HomeScreen() {
       ],
     };
   });
+
+  useEffect(() => {
+    loadGameData();
+  }, [user]);
+
+  const loadGameData = async () => {
+    console.log('[API] Loading game data...');
+    try {
+      // Fetch high score from stats (authenticated)
+      if (user) {
+        try {
+          const stats = await authenticatedGet<{ highScore: number; totalCoins: number; weeklyScore: number }>('/api/stats');
+          console.log('[API] Stats loaded:', stats);
+          setHighScore(stats.highScore || 0);
+        } catch (statsError) {
+          console.error('[API] Error loading stats:', statsError);
+        }
+
+        // Fetch daily objectives (authenticated)
+        try {
+          const objectivesData = await authenticatedGet<Array<{
+            objective: {
+              id: string;
+              title: string;
+              description: string;
+              targetValue: number;
+              rewardCoins: number;
+              icon: string;
+            };
+            userProgress: {
+              progress: number;
+              completed: boolean;
+            };
+          }>>('/api/objectives/daily');
+          console.log('[API] Daily objectives loaded:', objectivesData);
+          const mapped: DailyObjective[] = objectivesData.map((item) => ({
+            id: item.objective.id,
+            title: item.objective.title,
+            description: item.objective.description,
+            targetValue: item.objective.targetValue,
+            rewardCoins: item.objective.rewardCoins,
+            icon: item.objective.icon || 'star',
+            progress: item.userProgress?.progress || 0,
+            completed: item.userProgress?.completed || false,
+          }));
+          setDailyObjectives(mapped);
+        } catch (objError) {
+          console.error('[API] Error loading objectives:', objError);
+        }
+      }
+    } catch (error) {
+      console.error('[API] Error loading game data:', error);
+    }
+  };
 
   const flipGravity = () => {
     if (!gameStarted || gameOver) return;
@@ -104,12 +178,28 @@ export default function HomeScreen() {
   const endGame = () => {
     console.log("Game over - Score:", score);
     setGameOver(true);
+    
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
     if (gameLoopRef.current) {
       clearInterval(gameLoopRef.current);
       gameLoopRef.current = null;
+    }
+
+    // Submit score to backend (authenticated)
+    if (user && score > 0) {
+      console.log('[API] Submitting score:', score);
+      authenticatedPost<{ highScore: number; totalCoins: number; weeklyScore: number; coinsAwarded: number }>('/api/stats/score', { score })
+        .then((result) => {
+          console.log('[API] Score submitted, new high score:', result.highScore, 'coins awarded:', result.coinsAwarded);
+          setHighScore(result.highScore || 0);
+        })
+        .catch((err) => {
+          console.error('[API] Error submitting score:', err);
+        });
+    } else if (score > highScore) {
+      setHighScore(score);
     }
   };
 
@@ -359,8 +449,10 @@ export default function HomeScreen() {
   const scoreText = `${score}`;
   const gameOverText = 'Game Over!';
   const finalScoreText = `Score: ${score}`;
+  const highScoreText = `High Score: ${highScore}`;
   const startButtonText = gameOver ? 'Play Again' : 'Start Game';
   const instructionText = 'Tap to flip gravity';
+  const leaderboardButtonText = 'Leaderboard';
 
   return (
     <TouchableOpacity
@@ -469,8 +561,78 @@ export default function HomeScreen() {
       )}
 
       {!gameStarted && !gameOver && (
-        <View style={styles.menuContainer}>
+        <ScrollView 
+          style={styles.menuScrollView}
+          contentContainerStyle={[
+            styles.menuContainer,
+            Platform.OS !== 'ios' && styles.menuContainerWithTabBar
+          ]}
+        >
           <Text style={[styles.title, { color: textColor }]}>Gravity Flip</Text>
+          
+          <GlassView 
+            style={[
+              styles.highScoreCard,
+              Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+            ]} 
+            glassEffectStyle="regular"
+          >
+            <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="star" size={32} color="#FFD700" />
+            <Text style={[styles.highScoreText, { color: textColor }]}>{highScoreText}</Text>
+          </GlassView>
+
+          <TouchableOpacity
+            style={[styles.leaderboardButton, { backgroundColor: theme.dark ? '#1e293b' : '#f1f5f9' }]}
+            onPress={() => router.push('/leaderboard')}
+          >
+            <IconSymbol ios_icon_name="chart.bar.fill" android_material_icon_name="leaderboard" size={20} color={theme.colors.primary} />
+            <Text style={[styles.leaderboardButtonText, { color: textColor }]}>{leaderboardButtonText}</Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Daily Objectives</Text>
+          
+          {dailyObjectives.map((objective) => {
+            const progressPercent = Math.min((objective.progress / objective.targetValue) * 100, 100);
+            const progressText = `${objective.progress}/${objective.targetValue}`;
+            const rewardText = `+${objective.rewardCoins}`;
+            
+            return (
+              <GlassView 
+                key={objective.id}
+                style={[
+                  styles.objectiveCard,
+                  Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+                ]} 
+                glassEffectStyle="regular"
+              >
+                <View style={styles.objectiveHeader}>
+                  <IconSymbol 
+                    ios_icon_name={objective.icon} 
+                    android_material_icon_name={objective.icon} 
+                    size={24} 
+                    color={theme.colors.primary} 
+                  />
+                  <View style={styles.objectiveInfo}>
+                    <Text style={[styles.objectiveTitle, { color: textColor }]}>{objective.title}</Text>
+                    <Text style={[styles.objectiveProgress, { color: theme.dark ? '#98989D' : '#666' }]}>{progressText}</Text>
+                  </View>
+                  <View style={styles.rewardBadge}>
+                    <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={16} color="#FFD700" />
+                    <Text style={[styles.rewardText, { color: textColor }]}>{rewardText}</Text>
+                  </View>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: theme.dark ? '#1e293b' : '#e2e8f0' }]}>
+                  <View 
+                    style={[
+                      styles.progressFill, 
+                      { width: `${progressPercent}%`, backgroundColor: theme.colors.primary }
+                    ]} 
+                  />
+                </View>
+              </GlassView>
+            );
+          })}
+
           <Text style={[styles.instruction, { color: textColor }]}>{instructionText}</Text>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: buttonBg }]}
@@ -478,13 +640,16 @@ export default function HomeScreen() {
           >
             <Text style={[styles.buttonText, { color: buttonText }]}>{startButtonText}</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       )}
 
       {gameOver && (
         <View style={styles.menuContainer}>
           <Text style={[styles.gameOverText, { color: obstacleColor }]}>{gameOverText}</Text>
           <Text style={[styles.finalScore, { color: textColor }]}>{finalScoreText}</Text>
+          {score > highScore && (
+            <Text style={[styles.newHighScore, { color: '#FFD700' }]}>New High Score! 🎉</Text>
+          )}
           <TouchableOpacity
             style={[styles.button, { backgroundColor: buttonBg }]}
             onPress={startGame}
@@ -560,20 +725,106 @@ const styles = StyleSheet.create({
   bottomBoundary: {
     bottom: BOUNDARY_PADDING,
   },
-  menuContainer: {
+  menuScrollView: {
     flex: 1,
+  },
+  menuContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  menuContainerWithTabBar: {
+    paddingBottom: 120,
   },
   title: {
     fontSize: 48,
     fontWeight: 'bold',
+    marginBottom: 24,
+  },
+  highScoreCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
+    gap: 12,
+    width: '100%',
+    maxWidth: 400,
+  },
+  highScoreText: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  leaderboardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 32,
+    gap: 12,
+    width: '100%',
+    maxWidth: 400,
+  },
+  leaderboardButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+    width: '100%',
+    maxWidth: 400,
+  },
+  objectiveCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    width: '100%',
+    maxWidth: 400,
+  },
+  objectiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  objectiveInfo: {
+    flex: 1,
+  },
+  objectiveTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  objectiveProgress: {
+    fontSize: 14,
+  },
+  rewardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rewardText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   instruction: {
     fontSize: 18,
-    marginBottom: 32,
+    marginTop: 24,
+    marginBottom: 16,
     textAlign: 'center',
   },
   gameOverText: {
@@ -583,7 +834,12 @@ const styles = StyleSheet.create({
   },
   finalScore: {
     fontSize: 28,
-    marginBottom: 32,
+    marginBottom: 8,
+  },
+  newHighScore: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 24,
   },
   button: {
     paddingHorizontal: 40,
