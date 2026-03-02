@@ -24,6 +24,10 @@ const OBSTACLE_SPAWN_DISTANCE = 400;
 const FLOATING_OBSTACLE_SIZE = 50;
 const FLOATING_OBSTACLE_SPAWN_DISTANCE = 180;
 
+// Wall obstacle constants
+const WALL_OBSTACLE_HEIGHT = 60;
+const WALL_GAP_SIZE = 140;
+
 // Progressive difficulty constants
 const MIN_FULL_OBSTACLE_DISTANCE = 280;
 const MIN_FLOATING_OBSTACLE_DISTANCE = 140;
@@ -34,8 +38,10 @@ interface Obstacle {
   x: number;
   gapY: number;
   passed: boolean;
-  type: 'full' | 'floating';
+  type: 'full' | 'floating' | 'wall';
   floatingY?: number;
+  wallY?: number;
+  wallGapX?: number;
 }
 
 export default function HomeScreen() {
@@ -103,9 +109,6 @@ export default function HomeScreen() {
     const playerBottom = playerYPos + PLAYER_SIZE;
 
     for (const obstacle of obstaclesList) {
-      const obstacleLeft = obstacle.x;
-      const obstacleRight = obstacle.x + OBSTACLE_WIDTH;
-
       if (obstacle.type === 'floating' && obstacle.floatingY !== undefined) {
         const floatingLeft = obstacle.x;
         const floatingRight = obstacle.x + FLOATING_OBSTACLE_SIZE;
@@ -120,7 +123,24 @@ export default function HomeScreen() {
         ) {
           return true;
         }
+      } else if (obstacle.type === 'wall' && obstacle.wallY !== undefined && obstacle.wallGapX !== undefined) {
+        const wallTop = obstacle.wallY;
+        const wallBottom = obstacle.wallY + WALL_OBSTACLE_HEIGHT;
+        const wallLeft = obstacle.x;
+        const wallRight = obstacle.x + SCREEN_WIDTH;
+        const gapLeft = obstacle.wallGapX;
+        const gapRight = obstacle.wallGapX + WALL_GAP_SIZE;
+
+        if (playerBottom > wallTop && playerTop < wallBottom) {
+          const playerCenterX = playerLeft + PLAYER_SIZE / 2;
+          if (playerCenterX < gapLeft || playerCenterX > gapRight) {
+            return true;
+          }
+        }
       } else {
+        const obstacleLeft = obstacle.x;
+        const obstacleRight = obstacle.x + OBSTACLE_WIDTH;
+
         if (playerRight > obstacleLeft && playerLeft < obstacleRight) {
           const topObstacleBottom = obstacle.gapY;
           const bottomObstacleTop = obstacle.gapY + OBSTACLE_GAP;
@@ -163,13 +183,21 @@ export default function HomeScreen() {
           x: obs.x - GAME_SPEED,
         }));
 
-        newObstacles = newObstacles.filter((obs) => obs.x > -OBSTACLE_WIDTH);
+        newObstacles = newObstacles.filter((obs) => {
+          if (obs.type === 'wall') {
+            return obs.x > -SCREEN_WIDTH;
+          }
+          return obs.x > -OBSTACLE_WIDTH;
+        });
 
         let currentScore = 0;
         newObstacles.forEach((obs) => {
-          if (!obs.passed && obs.x + OBSTACLE_WIDTH < 50) {
-            obs.passed = true;
-            currentScore++;
+          if (!obs.passed) {
+            const passThreshold = obs.type === 'wall' ? obs.x + SCREEN_WIDTH : obs.x + OBSTACLE_WIDTH;
+            if (passThreshold < 50) {
+              obs.passed = true;
+              currentScore++;
+            }
           }
         });
         
@@ -194,7 +222,8 @@ export default function HomeScreen() {
         const lastObstacle = newObstacles[newObstacles.length - 1];
         const shouldSpawnFullObstacle = !lastObstacle || 
           (lastObstacle.type === 'full' && lastObstacle.x < SCREEN_WIDTH - currentFullObstacleDistance) ||
-          (lastObstacle.type === 'floating' && lastObstacle.x < SCREEN_WIDTH - currentFullObstacleDistance);
+          (lastObstacle.type === 'floating' && lastObstacle.x < SCREEN_WIDTH - currentFullObstacleDistance) ||
+          (lastObstacle.type === 'wall' && lastObstacle.x < SCREEN_WIDTH - currentFullObstacleDistance);
         
         const shouldSpawnFloatingObstacle = !lastObstacle || 
           lastObstacle.x < SCREEN_WIDTH - currentFloatingObstacleDistance;
@@ -216,18 +245,41 @@ export default function HomeScreen() {
               type: 'floating',
             });
             console.log("Spawned floating obstacle at Y:", floatingY, "- Difficulty:", difficultyMultiplier.toFixed(2));
-          } else if (shouldSpawnFullObstacle) {
-            const minGapY = BOUNDARY_PADDING + 80;
-            const maxGapY = SCREEN_HEIGHT - OBSTACLE_GAP - BOUNDARY_PADDING - 80;
-            const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
-            newObstacles.push({
-              id: obstacleCounter.current++,
-              x: SCREEN_WIDTH,
-              gapY,
-              passed: false,
-              type: 'full',
-            });
-            console.log("Spawned full obstacle with gap at Y:", gapY, "- Difficulty:", difficultyMultiplier.toFixed(2));
+          } else if (randomChoice < 0.85) {
+            if (shouldSpawnFullObstacle) {
+              const minGapY = BOUNDARY_PADDING + 80;
+              const maxGapY = SCREEN_HEIGHT - OBSTACLE_GAP - BOUNDARY_PADDING - 80;
+              const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
+              newObstacles.push({
+                id: obstacleCounter.current++,
+                x: SCREEN_WIDTH,
+                gapY,
+                passed: false,
+                type: 'full',
+              });
+              console.log("Spawned full obstacle with gap at Y:", gapY, "- Difficulty:", difficultyMultiplier.toFixed(2));
+            }
+          } else {
+            if (shouldSpawnFullObstacle) {
+              const minWallY = BOUNDARY_PADDING + 100;
+              const maxWallY = SCREEN_HEIGHT - BOUNDARY_PADDING - WALL_OBSTACLE_HEIGHT - 100;
+              const wallY = Math.random() * (maxWallY - minWallY) + minWallY;
+              
+              const minGapX = 80;
+              const maxGapX = SCREEN_WIDTH - WALL_GAP_SIZE - 80;
+              const wallGapX = Math.random() * (maxGapX - minGapX) + minGapX;
+              
+              newObstacles.push({
+                id: obstacleCounter.current++,
+                x: SCREEN_WIDTH,
+                gapY: 0,
+                wallY,
+                wallGapX,
+                passed: false,
+                type: 'wall',
+              });
+              console.log("Spawned wall obstacle at Y:", wallY, "with gap at X:", wallGapX, "- Difficulty:", difficultyMultiplier.toFixed(2));
+            }
           }
         }
 
@@ -251,6 +303,7 @@ export default function HomeScreen() {
   const playerColor = '#f59e0b';
   const obstacleColor = isDark ? '#dc2626' : '#ef4444';
   const floatingObstacleColor = isDark ? '#7c3aed' : '#a855f7';
+  const wallObstacleColor = isDark ? '#059669' : '#10b981';
   const textColor = isDark ? '#ffffff' : '#1e293b';
   const buttonBg = isDark ? '#1e40af' : '#3b82f6';
   const buttonText = '#ffffff';
@@ -310,6 +363,33 @@ export default function HomeScreen() {
                     },
                   ]}
                 />
+              ) : obstacle.type === 'wall' && obstacle.wallY !== undefined && obstacle.wallGapX !== undefined ? (
+                <>
+                  <View
+                    style={[
+                      styles.wallObstacle,
+                      {
+                        backgroundColor: wallObstacleColor,
+                        left: obstacle.x,
+                        top: obstacle.wallY,
+                        width: obstacle.wallGapX,
+                        height: WALL_OBSTACLE_HEIGHT,
+                      },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.wallObstacle,
+                      {
+                        backgroundColor: wallObstacleColor,
+                        left: obstacle.x + obstacle.wallGapX + WALL_GAP_SIZE,
+                        top: obstacle.wallY,
+                        width: SCREEN_WIDTH - obstacle.wallGapX - WALL_GAP_SIZE,
+                        height: WALL_OBSTACLE_HEIGHT,
+                      },
+                    ]}
+                  />
+                </>
               ) : (
                 <>
                   <View
@@ -404,6 +484,10 @@ const styles = StyleSheet.create({
   floatingObstacle: {
     position: 'absolute',
     borderRadius: 8,
+  },
+  wallObstacle: {
+    position: 'absolute',
+    borderRadius: 4,
   },
   greyedOutArea: {
     position: 'absolute',
