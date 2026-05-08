@@ -21,9 +21,8 @@ describe("API Integration Tests", () => {
     });
     await expectStatus(res, 200);
     const data = await res.json();
-    expect(data.created).toBeDefined();
-    expect(data.total).toBeDefined();
-    expect(data.message).toBeDefined();
+    expect(data.success).toBeDefined();
+    expect(data.count).toBeDefined();
   });
 
   // ============ Store - Items (Public) ============
@@ -82,6 +81,100 @@ describe("API Integration Tests", () => {
       body: JSON.stringify({ itemId }),
     });
     await expectStatus(res, 201);
+  });
+
+  // ============ Store - Equipped (Authenticated) ============
+  test("Get user equipped items", async () => {
+    const res = await authenticatedApi("/api/store/equipped", authToken);
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.skin).toBeDefined();
+    expect(data.trail).toBeDefined();
+    expect(data.theme).toBeDefined();
+    expect(data.gravity_effect).toBeDefined();
+    expect(data.death_effect).toBeDefined();
+  });
+
+  // ============ Store - Equip (Authenticated) ============
+  test("Equip item - missing itemId", async () => {
+    const res = await authenticatedApi("/api/store/equip", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slot: "skin" }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Equip item - missing slot", async () => {
+    const res = await authenticatedApi("/api/store/equip", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "00000000-0000-0000-0000-000000000000" }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Equip item - invalid itemId format", async () => {
+    const res = await authenticatedApi("/api/store/equip", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "invalid-uuid", slot: "skin" }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Equip item - invalid slot value", async () => {
+    const res = await authenticatedApi("/api/store/equip", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId: "00000000-0000-0000-0000-000000000000",
+        slot: "invalid-slot",
+      }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Equip item - nonexistent itemId", async () => {
+    const res = await authenticatedApi("/api/store/equip", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId: "00000000-0000-0000-0000-000000000000",
+        slot: "skin",
+      }),
+    });
+    await expectStatus(res, 403);
+  });
+
+  test("Equip item - valid", async () => {
+    if (!itemId) {
+      return;
+    }
+    const res = await authenticatedApi("/api/store/equip", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId, slot: "skin" }),
+    });
+    await expectStatus(res, 200, 403);
+  });
+
+  // ============ Store - Daily Streak (Authenticated) ============
+  test("Get daily streak", async () => {
+    const res = await authenticatedApi("/api/store/daily-streak", authToken);
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.currentStreak).toBeDefined();
+    expect(data.canClaimToday).toBeDefined();
+    expect(data.nextReward).toBeDefined();
+  });
+
+  // ============ Store - Claim Daily (Authenticated) ============
+  test("Claim daily reward", async () => {
+    const res = await authenticatedApi("/api/store/claim-daily", authToken, {
+      method: "POST",
+    });
+    await expectStatus(res, 200, 400);
   });
 
   // ============ Leaderboard - Public ============
