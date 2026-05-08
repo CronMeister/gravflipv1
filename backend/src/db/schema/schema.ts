@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, boolean, index, date } from 'drizzle-orm/pg-core';
 import { user } from './auth-schema.js';
 
 export const storeItems = pgTable('store_items', {
@@ -8,8 +8,43 @@ export const storeItems = pgTable('store_items', {
   price: integer('price').notNull(), // ZAR cents
   icon: text('icon').notNull(),
   category: text('category').notNull(),
+  rarity: text('rarity').notNull().default('common'),
+  currencyType: text('currency_type').notNull().default('flux'),
+  tab: text('tab').notNull().default('skins'),
+  iapProductId: text('iap_product_id'),
+  priceDisplay: text('price_display'),
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const userEquipped = pgTable('user_equipped', {
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  slot: text('slot').notNull(),
+  itemId: uuid('item_id').references(() => storeItems.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  { primaryKey: [table.userId, table.slot] },
+]);
+
+export const dailyStreak = pgTable('daily_streak', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  currentStreak: integer('current_streak').notNull().default(0),
+  lastClaimedDate: date('last_claimed_date'),
+  totalClaimed: integer('total_claimed').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const dailyRewardClaims = pgTable('daily_reward_claims', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  dayNumber: integer('day_number').notNull(),
+  rewardType: text('reward_type').notNull(),
+  rewardValue: integer('reward_value'),
+  rewardItemId: uuid('reward_item_id').references(() => storeItems.id, { onDelete: 'set null' }),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_daily_reward_claims_user_id').on(table.userId),
+]);
 
 export const userPurchases = pgTable('user_purchases', {
   id: uuid('id').primaryKey().defaultRandom(),
