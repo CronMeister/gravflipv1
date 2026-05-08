@@ -5,15 +5,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   Pressable,
   Animated,
   ActivityIndicator,
   Modal,
   Dimensions,
-  Platform,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { apiGet, apiPost, authenticatedGet, authenticatedPost } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -826,58 +824,43 @@ export default function StoreScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Bundle Carousel */}
             <Text style={styles.sectionTitle}>BUNDLES</Text>
-            <FlatList
+            <ScrollView
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              data={[
-                {
-                  key: 'starter',
-                  title: 'STARTER PACK',
-                  badge: 'BEST VALUE',
-                  badgeColor: C.gold,
-                  contents: ['Singularity Core skin', 'RGB Spectrum Trail', '2000 Flux'],
-                  price: '$3.99',
-                  btnLabel: 'GET STARTER PACK',
-                  gradFrom: '#1a0533',
-                  gradTo: '#0d1f4a',
-                  btnGradFrom: '#f59e0b',
-                  btnGradTo: '#d97706',
-                },
-                {
-                  key: 'premium',
-                  title: 'PREMIUM BUNDLE',
-                  badge: 'MOST POPULAR',
-                  badgeColor: C.purple,
-                  contents: ['Celestial Reactor skin', 'Plasma Storm Trail', 'Deep Space Theme', '5000 Flux'],
-                  price: '$7.99',
-                  btnLabel: 'GET PREMIUM BUNDLE',
-                  gradFrom: '#0d1f4a',
-                  gradTo: '#1a0533',
-                  btnGradFrom: '#a855f7',
-                  btnGradTo: '#7c3aed',
-                },
-              ]}
-              keyExtractor={(b) => b.key}
-              renderItem={({ item: bundle }) => (
-                <View style={{ paddingHorizontal: 8 }}>
-                  <FeaturedBundleCard
-                    title={bundle.title}
-                    badge={bundle.badge}
-                    badgeColor={bundle.badgeColor}
-                    contents={bundle.contents}
-                    price={bundle.price}
-                    btnLabel={bundle.btnLabel}
-                    gradFrom={bundle.gradFrom}
-                    gradTo={bundle.gradTo}
-                    btnGradFrom={bundle.btnGradFrom}
-                    btnGradTo={bundle.btnGradTo}
-                    onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
-                  />
-                </View>
-              )}
               contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 8 }}
-            />
+            >
+              <View style={{ paddingHorizontal: 8 }}>
+                <FeaturedBundleCard
+                  title="STARTER PACK"
+                  badge="BEST VALUE"
+                  badgeColor={C.gold}
+                  contents={['Singularity Core skin', 'RGB Spectrum Trail', '2000 Flux']}
+                  price="$3.99"
+                  btnLabel="GET STARTER PACK"
+                  gradFrom="#1a0533"
+                  gradTo="#0d1f4a"
+                  btnGradFrom="#f59e0b"
+                  btnGradTo="#d97706"
+                  onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
+                />
+              </View>
+              <View style={{ paddingHorizontal: 8 }}>
+                <FeaturedBundleCard
+                  title="PREMIUM BUNDLE"
+                  badge="MOST POPULAR"
+                  badgeColor={C.purple}
+                  contents={['Celestial Reactor skin', 'Plasma Storm Trail', 'Deep Space Theme', '5000 Flux']}
+                  price="$7.99"
+                  btnLabel="GET PREMIUM BUNDLE"
+                  gradFrom="#0d1f4a"
+                  gradTo="#1a0533"
+                  btnGradFrom="#a855f7"
+                  btnGradTo="#7c3aed"
+                  onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
+                />
+              </View>
+            </ScrollView>
 
             {/* Featured Items Grid */}
             <Text style={[styles.sectionTitle, { marginTop: 24 }]}>FEATURED ITEMS</Text>
@@ -1319,7 +1302,10 @@ const styles = StyleSheet.create({
   },
   featuredCardBorder: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 20,
     borderWidth: 1.5,
   },
@@ -1393,7 +1379,10 @@ const styles = StyleSheet.create({
   },
   dailyCardBorder: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: `${C.cyan}33`,
@@ -1564,7 +1553,10 @@ const styles = StyleSheet.create({
   },
   purchaseModalBorder: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: `${C.cyan}66`,
@@ -1632,7 +1624,10 @@ const styles = StyleSheet.create({
   },
   infoModalBorder: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
