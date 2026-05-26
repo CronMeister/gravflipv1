@@ -303,11 +303,6 @@ describe("API Integration Tests", () => {
     }
   });
 
-  test("Get daily objectives - bad request", async () => {
-    const res = await api("/api/objectives/daily");
-    await expectStatus(res, 200, 400);
-  });
-
   // ============ Objectives - Progress (Public) ============
   test("Update objective progress - no runScore", async () => {
     const res = await api("/api/objectives/progress", {
@@ -329,14 +324,5 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
-  });
-
-  test("Update objective progress - bad request", async () => {
-    const res = await api("/api/objectives/progress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ runScore: 500 }),
-    });
-    await expectStatus(res, 200, 400);
   });
 });

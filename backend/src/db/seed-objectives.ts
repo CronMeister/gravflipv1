@@ -23,7 +23,7 @@ export async function seedObjectives(app: App) {
       description: `Reach a score of ${targetValue} in a single run`,
       target_value: targetValue,
       reward_coins: Math.floor(targetValue / 5),
-      icon: '🎯',
+      icon: 'flash-on',
       kind: 'score_in_run',
     });
   }
@@ -38,7 +38,7 @@ export async function seedObjectives(app: App) {
       description: `Accumulate a total score of ${targetValue} today`,
       target_value: targetValue,
       reward_coins: Math.floor(targetValue / 10),
-      icon: '📊',
+      icon: 'trending-up',
       kind: 'score_total_today',
     });
   }
@@ -53,7 +53,7 @@ export async function seedObjectives(app: App) {
       description: `Complete ${targetValue} run${targetValue !== 1 ? 's' : ''} today`,
       target_value: targetValue,
       reward_coins: targetValue * 3,
-      icon: '🏃',
+      icon: 'replay',
       kind: 'runs_today',
     });
   }

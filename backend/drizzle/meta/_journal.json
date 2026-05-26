@@ -36,6 +36,13 @@
       "when": 1779817728940,
       "tag": "20260526174848_modern_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779821400000,
+      "tag": "20260526190000_update_objectives_icons",
+      "breakpoints": true
     }
   ]
 }
