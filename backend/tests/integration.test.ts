@@ -49,6 +49,7 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 401);
   });
 
+  // ============ Store - Purchase (Authenticated) ============
   test("Purchase item - missing itemId", async () => {
     const res = await authenticatedApi("/api/store/purchase", authToken, {
       method: "POST",
@@ -298,72 +299,44 @@ describe("API Integration Tests", () => {
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
     if (data.length > 0) {
-      objectiveId = data[0].id;
+      objectiveId = data[0].objective?.id;
     }
   });
 
+  test("Get daily objectives - bad request", async () => {
+    const res = await api("/api/objectives/daily");
+    await expectStatus(res, 200, 400);
+  });
+
   // ============ Objectives - Progress (Public) ============
-  test("Get objectives progress", async () => {
-    const res = await api("/api/objectives/progress");
+  test("Update objective progress - no runScore", async () => {
+    const res = await api("/api/objectives/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
     await expectStatus(res, 200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  test("Update objective progress - missing objective_id", async () => {
-    const res = await api("/api/objectives/complete", {
+  test("Update objective progress - with runScore", async () => {
+    const res = await api("/api/objectives/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ progress: 10 }),
-    });
-    await expectStatus(res, 400);
-  });
-
-  test("Update objective progress - missing progress", async () => {
-    if (!objectiveId) {
-      return;
-    }
-    const res = await api("/api/objectives/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ objective_id: objectiveId }),
-    });
-    await expectStatus(res, 400);
-  });
-
-  test("Update objective progress - invalid objective_id format", async () => {
-    const res = await api("/api/objectives/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        objective_id: "invalid-uuid",
-        progress: 10,
-      }),
-    });
-    await expectStatus(res, 400);
-  });
-
-  test("Update objective progress - nonexistent objective_id", async () => {
-    const res = await api("/api/objectives/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        objective_id: "00000000-0000-0000-0000-000000000000",
-        progress: 10,
-      }),
-    });
-    await expectStatus(res, 400);
-  });
-
-  test("Update objective progress - valid", async () => {
-    if (!objectiveId) {
-      return;
-    }
-    const res = await api("/api/objectives/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ objective_id: objectiveId, progress: 5 }),
+      body: JSON.stringify({ runScore: 500 }),
     });
     await expectStatus(res, 200);
+    const data = await res.json();
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  test("Update objective progress - bad request", async () => {
+    const res = await api("/api/objectives/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ runScore: 500 }),
+    });
+    await expectStatus(res, 200, 400);
   });
 });

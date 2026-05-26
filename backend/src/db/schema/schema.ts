@@ -76,8 +76,11 @@ export const objectives = pgTable('objectives', {
   reward_coins: integer('reward_coins').notNull(),
   icon: text('icon').notNull(),
   kind: text('kind').notNull(),
+  code: text('code'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index('idx_objectives_code').on(table.code),
+]);
 
 export const userObjectives = pgTable('user_objectives', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -86,10 +89,12 @@ export const userObjectives = pgTable('user_objectives', {
   completed: boolean('completed').notNull().default(false),
   completed_at: timestamp('completed_at', { withTimezone: true }),
   date: timestamp('date', { withTimezone: true }).notNull(),
+  date_utc: text('date_utc'),
   device_id: text('device_id').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index('idx_user_objectives_objective_id').on(table.objective_id),
   index('idx_user_objectives_date').on(table.date),
   index('idx_user_objectives_device_date').on(table.device_id, table.date),
+  index('idx_user_objectives_device_date_utc').on(table.device_id, table.date_utc),
 ]);

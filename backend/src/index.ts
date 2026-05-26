@@ -5,6 +5,7 @@ import { registerStoreRoutes } from './routes/store.js';
 import { registerLeaderboardRoutes } from './routes/leaderboard.js';
 import { registerStatsRoutes } from './routes/stats.js';
 import { registerObjectivesRoutes } from './routes/objectives.js';
+import { seedObjectives } from './db/seed-objectives.js';
 
 const schema = { ...appSchema, ...authSchema };
 
@@ -16,6 +17,10 @@ export type App = typeof app;
 
 // Enable authentication
 app.withAuth();
+
+// Seed objectives
+app.logger.info('Seeding objectives...');
+await seedObjectives(app);
 
 // Register routes
 registerStoreRoutes(app, app.fastify);
