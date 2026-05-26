@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, index, date } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, boolean, index, date, primaryKey } from 'drizzle-orm/pg-core';
 import { user } from './auth-schema.js';
 
 export const storeItems = pgTable('store_items', {
@@ -22,9 +22,9 @@ export const userEquipped = pgTable('user_equipped', {
   slot: text('slot').notNull(),
   itemId: uuid('item_id').references(() => storeItems.id, { onDelete: 'set null' }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  { primaryKey: [table.userId, table.slot] },
-]);
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.slot] }),
+}));
 
 export const dailyStreak = pgTable('daily_streak', {
   userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),

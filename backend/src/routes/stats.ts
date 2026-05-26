@@ -103,12 +103,13 @@ export function registerStatsRoutes(app: App, fastify: FastifyInstance) {
 
     const { score } = request.body;
 
-    if (typeof score !== 'number' || score < 0) {
+    // Validation: score must be a non-negative integer
+    if (!Number.isInteger(score) || score < 0) {
       app.logger.warn({ userId: session.user.id, score }, 'Invalid score value');
-      return reply.status(400).send({ error: 'Score must be a non-negative number' });
+      return reply.status(400).send({ error: 'Score must be a non-negative integer' });
     }
 
-    app.logger.info({ userId: session.user.id, score }, 'Processing score update');
+    const coinsAwarded = score;
 
     try {
       let userStats = await app.db.query.userStats.findFirst({
@@ -121,13 +122,12 @@ export function registerStatsRoutes(app: App, fastify: FastifyInstance) {
         const created = await app.db.insert(schema.userStats).values({
           userId: session.user.id,
           highScore: score,
-          totalCoins: score, // Award coins equal to score
+          totalCoins: coinsAwarded,
           weeklyScore: score,
         }).returning();
         userStats = created[0];
       } else {
         // Update existing stats
-        const coinsAwarded = score;
         const newHighScore = Math.max(userStats.highScore, score);
         const newWeeklyScore = userStats.weeklyScore + score;
         const newTotalCoins = userStats.totalCoins + coinsAwarded;
@@ -142,15 +142,15 @@ export function registerStatsRoutes(app: App, fastify: FastifyInstance) {
         userStats = updated[0];
       }
 
+      const newTotalCoins = userStats.totalCoins;
       app.logger.info(
         {
           userId: session.user.id,
-          highScore: userStats.highScore,
-          totalCoins: userStats.totalCoins,
-          weeklyScore: userStats.weeklyScore,
-          coinsAwarded: score,
+          score,
+          coinsAwarded,
+          newTotalCoins,
         },
-        'Score updated successfully'
+        'Score submitted'
       );
 
       return {
@@ -158,7 +158,7 @@ export function registerStatsRoutes(app: App, fastify: FastifyInstance) {
         highScore: userStats.highScore,
         totalCoins: userStats.totalCoins,
         weeklyScore: userStats.weeklyScore,
-        coinsAwarded: score,
+        coinsAwarded: coinsAwarded,
         lastScoreUpdate: userStats.lastScoreUpdate,
       };
     } catch (error) {

@@ -296,6 +296,15 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 200);
   });
 
+  test("Complete objective - missing objectiveId", async () => {
+    const res = await authenticatedApi("/api/objectives/complete", authToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    await expectStatus(res, 400);
+  });
+
   test("Complete objective - invalid objectiveId format", async () => {
     const res = await authenticatedApi("/api/objectives/complete", authToken, {
       method: "POST",

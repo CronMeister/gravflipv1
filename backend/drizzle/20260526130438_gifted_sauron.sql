@@ -1,0 +1,1 @@
+ALTER TABLE "user_equipped" ADD CONSTRAINT "user_equipped_user_id_slot_pk" PRIMARY KEY("user_id","slot");
