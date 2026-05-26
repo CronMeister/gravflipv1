@@ -180,22 +180,28 @@ export default function HomeScreen() {
   };
 
   const endGame = () => {
-    console.log("Game over - Score:", score);
+    const finalScore = scoreRef.current;
+    console.log("Game over - Score:", finalScore);
     setGameOver(true);
-    
+    setScore(finalScore);
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     if (gameLoopRef.current) {
       clearInterval(gameLoopRef.current);
       gameLoopRef.current = null;
     }
+    if (spawnTimerRef.current) {
+      clearTimeout(spawnTimerRef.current);
+      spawnTimerRef.current = null;
+    }
 
     // Optimistically set coins earned to score immediately
-    setCoinsEarned(score);
+    setCoinsEarned(finalScore);
 
     // Submit score to backend (authenticated)
-    if (user && score > 0) {
-      console.log('[API] Submitting score:', score);
-      authenticatedPost<{ highScore: number; totalCoins: number; weeklyScore: number; coinsAwarded: number }>('/api/stats/score', { score })
+    if (user && finalScore > 0) {
+      console.log('[API] Submitting score:', finalScore);
+      authenticatedPost<{ highScore: number; totalCoins: number; weeklyScore: number; coinsAwarded: number }>('/api/stats/score', { score: finalScore })
         .then((result) => {
           console.log('[API] Score submitted, new high score:', result.highScore, 'coins awarded:', result.coinsAwarded);
           setHighScore(result.highScore || 0);
@@ -205,8 +211,8 @@ export default function HomeScreen() {
         .catch((err) => {
           console.error('[API] Error submitting score:', err);
         });
-    } else if (score > highScore) {
-      setHighScore(score);
+    } else if (finalScore > highScore) {
+      setHighScore(finalScore);
     }
   };
 
