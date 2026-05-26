@@ -245,7 +245,7 @@ function FluxPackPreview({ item }: { item: StoreItem }) {
           <IconSymbol
             key={i}
             ios_icon_name="bolt.fill"
-            android_material_icon_name="flash-on"
+            android_material_icon_name="flash_on"
             size={20 + i * 4}
             color="#f59e0b"
           />
@@ -270,7 +270,7 @@ function ItemPreviewComponent({ item }: { item: StoreItem }) {
     <View style={previewStyles.container}>
       <IconSymbol
         ios_icon_name="sparkles"
-        android_material_icon_name="auto-awesome"
+        android_material_icon_name="auto_awesome"
         size={36}
         color={RARITY_COLOR[item.rarity] || RARITY_COLOR.common}
       />
@@ -477,7 +477,7 @@ function ItemCard({
               <View style={cardStyles.btnInner}>
                 <IconSymbol
                   ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
+                  android_material_icon_name="check_circle"
                   size={14}
                   color="#ffffff"
                 />
@@ -487,7 +487,7 @@ function ItemCard({
               <View style={cardStyles.btnInner}>
                 <IconSymbol
                   ios_icon_name="checkmark.circle"
-                  android_material_icon_name="check-circle-outline"
+                  android_material_icon_name="check_circle_outline"
                   size={14}
                   color={btnTextColor}
                 />
@@ -581,7 +581,7 @@ function FluxPackCard({
         <View style={packStyles.middle}>
           <Text style={[packStyles.name, { color: textColor }]}>{item.name}</Text>
           <View style={packStyles.amountRow}>
-            <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={14} color="#f59e0b" />
+            <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash_on" size={14} color="#f59e0b" />
             <Text style={packStyles.amount}>{fluxAmount}</Text>
             <Text style={[packStyles.fluxLabel, { color: secondaryColor }]}>FLUX</Text>
           </View>
@@ -707,7 +707,7 @@ function FeaturedBundleCard({
             <View key={i} style={bundleStyles.contentRow}>
               <IconSymbol
                 ios_icon_name="checkmark.circle.fill"
-                android_material_icon_name="check-circle"
+                android_material_icon_name="check_circle"
                 size={14}
                 color={badgeColor}
               />
@@ -918,7 +918,7 @@ function PurchaseModal({
           >
             <IconSymbol
               ios_icon_name="checkmark.circle.fill"
-              android_material_icon_name="check-circle"
+              android_material_icon_name="check_circle"
               size={56}
               color={theme.colors.primary}
             />
@@ -1327,7 +1327,7 @@ export default function StoreScreen() {
         glassEffectStyle="regular"
       >
         <View style={styles.fluxPill}>
-          <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={16} color="#f59e0b" />
+          <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash_on" size={16} color="#f59e0b" />
           <Text style={[styles.fluxAmount, { color: textColor }]}>{fluxDisplay}</Text>
         </View>
         <Text style={[styles.storeTitle, { color: textColor }]}>Store</Text>
@@ -1408,7 +1408,7 @@ export default function StoreScreen() {
             <Text style={[styles.sectionLabel, { color: secondaryColor, marginTop: 8 }]}>FEATURED ITEMS</Text>
             {tabItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={40} color={secondaryColor} />
+                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto_awesome" size={40} color={secondaryColor} />
                 <Text style={[styles.emptyText, { color: textColor }]}>No featured items yet</Text>
                 <Text style={[styles.emptySubtext, { color: secondaryColor }]}>Check back soon for legendary drops</Text>
               </View>
@@ -1436,7 +1436,7 @@ export default function StoreScreen() {
             <Text style={[styles.sectionLabel, { color: secondaryColor }]}>{activeTab.toUpperCase()}</Text>
             {tabItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={40} color={secondaryColor} />
+                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto_awesome" size={40} color={secondaryColor} />
                 <Text style={[styles.emptyText, { color: textColor }]}>No {activeTab.toLowerCase()} yet</Text>
                 <Text style={[styles.emptySubtext, { color: secondaryColor }]}>New items drop regularly</Text>
               </View>
@@ -1465,7 +1465,7 @@ export default function StoreScreen() {
             <Text style={[styles.sectionSubtitle, { color: secondaryColor }]}>Top up your Flux balance</Text>
             {tabItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={40} color={secondaryColor} />
+                <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash_on" size={40} color={secondaryColor} />
                 <Text style={[styles.emptyText, { color: textColor }]}>No packs available</Text>
                 <Text style={[styles.emptySubtext, { color: secondaryColor }]}>Check back soon</Text>
               </View>
@@ -1498,7 +1498,7 @@ export default function StoreScreen() {
               glassEffectStyle="regular"
             >
               <View style={styles.dailyTitleRow}>
-                <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={20} color={theme.colors.primary} />
+                <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card_giftcard" size={20} color={theme.colors.primary} />
                 <Text style={[styles.dailyTitle, { color: textColor }]}>Daily Reward</Text>
               </View>
 
@@ -1519,7 +1519,7 @@ export default function StoreScreen() {
                   </View>
                   {dailyStreak?.nextReward && (
                     <View style={[styles.dailyRewardPreview, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
-                      <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={20} color="#f59e0b" />
+                      <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash_on" size={20} color="#f59e0b" />
                       <Text style={styles.dailyRewardValue}>{formatFlux(dailyStreak.nextReward.value)}</Text>
                       <Text style={[styles.dailyRewardType, { color: secondaryColor }]}>FLUX</Text>
                     </View>
