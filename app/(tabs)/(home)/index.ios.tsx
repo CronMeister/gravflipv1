@@ -79,6 +79,8 @@ export default function HomeScreen() {
   const [score, setScore] = useState(0);
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [highScore, setHighScore] = useState(0);
+  const [totalCoins, setTotalCoins] = useState(0);
+  const [coinsEarned, setCoinsEarned] = useState(0);
   const [dailyObjectives, setDailyObjectives] = useState<DailyObjective[]>([]);
   
   const playerY = useSharedValue(SCREEN_HEIGHT / 2);
@@ -107,6 +109,7 @@ export default function HomeScreen() {
           const stats = await authenticatedGet<{ highScore: number; totalCoins: number; weeklyScore: number }>('/api/stats');
           console.log('[API] Stats loaded:', stats);
           setHighScore(stats.highScore || 0);
+          setTotalCoins(stats.totalCoins || 0);
         } catch (statsError) {
           console.error('[API] Error loading stats:', statsError);
         }
@@ -167,6 +170,7 @@ export default function HomeScreen() {
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
+    setCoinsEarned(0);
     setObstacles([]);
     playerY.value = SCREEN_HEIGHT / 2;
     playerVelocity.current = 0;
@@ -185,6 +189,9 @@ export default function HomeScreen() {
       gameLoopRef.current = null;
     }
 
+    // Optimistically set coins earned to score immediately
+    setCoinsEarned(score);
+
     // Submit score to backend (authenticated)
     if (user && score > 0) {
       console.log('[API] Submitting score:', score);
@@ -192,6 +199,8 @@ export default function HomeScreen() {
         .then((result) => {
           console.log('[API] Score submitted, new high score:', result.highScore, 'coins awarded:', result.coinsAwarded);
           setHighScore(result.highScore || 0);
+          setTotalCoins(result.totalCoins || 0);
+          setCoinsEarned(result.coinsAwarded || 0);
         })
         .catch((err) => {
           console.error('[API] Error submitting score:', err);
@@ -427,6 +436,8 @@ export default function HomeScreen() {
   const gameOverText = 'Game Over!';
   const finalScoreText = `Score: ${score}`;
   const highScoreText = `High Score: ${highScore}`;
+  const fluxText = `Flux: ${totalCoins.toLocaleString()}`;
+  const fluxEarnedText = `+${coinsEarned} Flux`;
   const startButtonText = gameOver ? 'Play Again' : 'Start Game';
   const instructionText = 'Tap to flip gravity';
   const leaderboardButtonText = 'Leaderboard';
@@ -541,6 +552,11 @@ export default function HomeScreen() {
             <Text style={[styles.highScoreText, { color: textColor }]}>{highScoreText}</Text>
           </GlassView>
 
+          <GlassView style={styles.highScoreCard} glassEffectStyle="regular">
+            <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="bolt" size={32} color="#FFD700" />
+            <Text style={[styles.highScoreText, { color: textColor }]}>{fluxText}</Text>
+          </GlassView>
+
           <TouchableOpacity
             style={[styles.leaderboardButton, { backgroundColor: theme.dark ? '#1e293b' : '#f1f5f9' }]}
             onPress={() => router.push('/leaderboard')}
@@ -603,6 +619,7 @@ export default function HomeScreen() {
           {score > highScore && (
             <Text style={[styles.newHighScore, { color: '#FFD700' }]}>New High Score! 🎉</Text>
           )}
+          <Text style={[styles.fluxEarnedText, { color: '#FFD700' }]}>{fluxEarnedText}</Text>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: buttonBg }]}
             onPress={startGame}
@@ -788,7 +805,12 @@ const styles = StyleSheet.create({
   newHighScore: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 24,
+    marginBottom: 8,
+  },
+  fluxEarnedText: {
+    fontSize: 22,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   button: {
     paddingHorizontal: 40,
