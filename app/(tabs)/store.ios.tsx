@@ -10,34 +10,31 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@react-navigation/native';
+import { GlassView } from 'expo-glass-effect';
+import { IconSymbol } from '@/components/IconSymbol';
 import { apiGet, apiPost, authenticatedGet, authenticatedPost } from '@/utils/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
 
-// ─── Color tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg0: '#050818',
-  bg1: '#0a0f2e',
-  cyan: '#00f5ff',
-  cyanDim: 'rgba(0,245,255,0.15)',
-  cyanGlow: 'rgba(0,245,255,0.35)',
-  gold: '#f59e0b',
-  goldDim: 'rgba(245,158,11,0.15)',
-  purple: '#a855f7',
-  purpleDim: 'rgba(168,85,247,0.15)',
-  white: '#ffffff',
-  whiteFaded: 'rgba(255,255,255,0.4)',
-  surface: 'rgba(255,255,255,0.05)',
-  surfaceBorder: 'rgba(255,255,255,0.1)',
-  rare: '#00f5ff',
+// ─── Rarity colors (toned-down, design-system aligned) ───────────────────────
+const RARITY_COLOR: Record<string, string> = {
+  common: '#9ca3af',
+  rare: '#3b82f6',
   epic: '#a855f7',
   legendary: '#f59e0b',
-  common: '#9ca3af',
+};
+
+const RARITY_LABEL: Record<string, string> = {
+  common: 'COMMON',
+  rare: 'RARE',
+  epic: 'EPIC',
+  legendary: 'LEGENDARY',
 };
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -81,39 +78,6 @@ interface DailyStreak {
 const TABS = ['Featured', 'Skins', 'Trails', 'Themes', 'Effects', 'Premium', 'Daily'] as const;
 type TabName = typeof TABS[number];
 
-const TAB_TO_API: Record<TabName, string> = {
-  Featured: 'featured',
-  Skins: 'skins',
-  Trails: 'trails',
-  Themes: 'themes',
-  Effects: 'effects',
-  Premium: 'premium',
-  Daily: 'daily',
-};
-
-const RARITY_COLOR: Record<string, string> = {
-  common: C.common,
-  rare: C.rare,
-  epic: C.epic,
-  legendary: C.legendary,
-};
-
-const RARITY_LABEL: Record<string, string> = {
-  common: 'COMMON',
-  rare: 'RARE',
-  epic: 'EPIC',
-  legendary: 'LEGENDARY',
-};
-
-function rarityGlow(rarity: string): string {
-  switch (rarity) {
-    case 'legendary': return 'rgba(245,158,11,0.5)';
-    case 'epic': return 'rgba(168,85,247,0.5)';
-    case 'rare': return 'rgba(0,245,255,0.5)';
-    default: return 'rgba(255,255,255,0.15)';
-  }
-}
-
 function categoryToSlot(category: string): string {
   if (category === 'effect') return 'gravity_effect';
   return category;
@@ -121,6 +85,22 @@ function categoryToSlot(category: string): string {
 
 function formatFlux(n: number): string {
   return Number(n).toLocaleString();
+}
+
+// ─── Theme palette for ThemePreview ──────────────────────────────────────────
+function getThemePalette(name: string): [string, string] {
+  const lower = name.toLowerCase();
+  if (lower.includes('retro') || lower.includes('neon')) return ['#ff00ff', '#00ffff'];
+  if (lower.includes('cyber') || lower.includes('grid')) return ['#00ff41', '#0d0d0d'];
+  if (lower.includes('matrix')) return ['#00ff41', '#003300'];
+  if (lower.includes('deep') || lower.includes('space')) return ['#0a0a2e', '#6600cc'];
+  if (lower.includes('solar') || lower.includes('storm')) return ['#ff6600', '#cc0000'];
+  if (lower.includes('vapor') || lower.includes('wave')) return ['#ff71ce', '#b967ff'];
+  if (lower.includes('ocean') || lower.includes('aqua')) return ['#006994', '#00d4ff'];
+  if (lower.includes('forest') || lower.includes('nature')) return ['#228b22', '#8b4513'];
+  if (lower.includes('fire') || lower.includes('lava')) return ['#ff4500', '#8b0000'];
+  if (lower.includes('ice') || lower.includes('frost')) return ['#87ceeb', '#4169e1'];
+  return ['#1e293b', '#475569'];
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -167,54 +147,267 @@ function LegendaryRotator({ color }: { color: string }) {
     <Animated.View
       style={{
         position: 'absolute',
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        borderWidth: 2,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 1.5,
         borderColor: color,
         borderStyle: 'dashed',
         transform: [{ rotate }],
-        opacity: 0.6,
+        opacity: 0.5,
       }}
     />
   );
 }
 
-function ItemPreview({ item }: { item: StoreItem }) {
-  const color = RARITY_COLOR[item.rarity] || C.common;
+// ─── Category-specific preview components ────────────────────────────────────
+
+function SkinPreview({ item }: { item: StoreItem }) {
+  const color = RARITY_COLOR[item.rarity] || RARITY_COLOR.common;
   const isLegendary = item.rarity === 'legendary';
-  const emoji = item.icon || '✦';
   return (
-    <View style={styles.previewArea}>
+    <View style={previewStyles.container}>
       {isLegendary && <LegendaryRotator color={color} />}
-      <View
-        style={[
-          styles.previewCircle,
-          {
-            backgroundColor: `${color}22`,
-            borderColor: `${color}55`,
-            shadowColor: color,
-            shadowOpacity: 0.6,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 0 },
-          },
-        ]}
-      >
-        <Text style={{ fontSize: 28 }}>{emoji}</Text>
+      <View style={[previewStyles.skinCircle, { backgroundColor: color }]}>
+        <View style={previewStyles.skinSheen} />
       </View>
     </View>
   );
 }
 
-function RarityBadge({ rarity }: { rarity: string }) {
-  const color = RARITY_COLOR[rarity] || C.common;
+function TrailPreview({ item }: { item: StoreItem }) {
+  const color = RARITY_COLOR[item.rarity] || RARITY_COLOR.common;
+  const dots = [
+    { size: 8, opacity: 0.2 },
+    { size: 10, opacity: 0.35 },
+    { size: 12, opacity: 0.55 },
+    { size: 14, opacity: 0.75 },
+    { size: 16, opacity: 1.0 },
+  ];
   return (
-    <View style={[styles.rarityBadge, { backgroundColor: `${color}22`, borderColor: `${color}55` }]}>
-      <Text style={[styles.rarityText, { color }]}>{RARITY_LABEL[rarity] || rarity.toUpperCase()}</Text>
+    <View style={previewStyles.container}>
+      <View style={previewStyles.trailRow}>
+        {dots.map((d, i) => (
+          <View
+            key={i}
+            style={[
+              previewStyles.trailDot,
+              {
+                width: d.size,
+                height: d.size,
+                borderRadius: d.size / 2,
+                backgroundColor: color,
+                opacity: d.opacity,
+              },
+            ]}
+          />
+        ))}
+        <View style={[previewStyles.trailPlayer, { backgroundColor: color }]}>
+          <View style={previewStyles.skinSheen} />
+        </View>
+      </View>
     </View>
   );
 }
 
+function ThemePreview({ item }: { item: StoreItem }) {
+  const [bgColor, obstacleColor] = getThemePalette(item.name);
+  return (
+    <View style={previewStyles.container}>
+      <View style={[previewStyles.themeScene, { backgroundColor: bgColor }]}>
+        <View style={[previewStyles.themeObstacleLeft, { backgroundColor: obstacleColor }]} />
+        <View style={[previewStyles.themeObstacleRight, { backgroundColor: obstacleColor }]} />
+        <View style={[previewStyles.themePlayer, { backgroundColor: '#f59e0b' }]} />
+      </View>
+    </View>
+  );
+}
+
+function EffectPreview({ item }: { item: StoreItem }) {
+  const color = RARITY_COLOR[item.rarity] || RARITY_COLOR.common;
+  return (
+    <View style={previewStyles.container}>
+      <View style={[previewStyles.effectRing3, { borderColor: color, opacity: 0.15 }]} />
+      <View style={[previewStyles.effectRing2, { borderColor: color, opacity: 0.3 }]} />
+      <View style={[previewStyles.effectRing1, { borderColor: color, opacity: 0.6 }]} />
+      <View style={[previewStyles.effectCore, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+function FluxPackPreview({ item }: { item: StoreItem }) {
+  const boltCount = item.price <= 100 ? 1 : item.price <= 500 ? 2 : item.price <= 2000 ? 3 : 4;
+  const bolts = Array.from({ length: boltCount });
+  return (
+    <View style={previewStyles.container}>
+      <View style={previewStyles.fluxBolts}>
+        {bolts.map((_, i) => (
+          <IconSymbol
+            key={i}
+            ios_icon_name="bolt.fill"
+            android_material_icon_name="flash-on"
+            size={20 + i * 4}
+            color="#f59e0b"
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ItemPreviewComponent({ item }: { item: StoreItem }) {
+  if (item.tab === 'skins') return <SkinPreview item={item} />;
+  if (item.tab === 'trails') return <TrailPreview item={item} />;
+  if (item.tab === 'themes') return <ThemePreview item={item} />;
+  if (item.tab === 'effects') return <EffectPreview item={item} />;
+  if (item.tab === 'premium') return <FluxPackPreview item={item} />;
+  // Fallback for featured tab — pick by category
+  if (item.category === 'skin') return <SkinPreview item={item} />;
+  if (item.category === 'trail') return <TrailPreview item={item} />;
+  if (item.category === 'theme') return <ThemePreview item={item} />;
+  if (item.category === 'effect') return <EffectPreview item={item} />;
+  return (
+    <View style={previewStyles.container}>
+      <IconSymbol
+        ios_icon_name="sparkles"
+        android_material_icon_name="auto-awesome"
+        size={36}
+        color={RARITY_COLOR[item.rarity] || RARITY_COLOR.common}
+      />
+    </View>
+  );
+}
+
+const previewStyles = StyleSheet.create({
+  container: {
+    height: 140,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skinCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  skinSheen: {
+    position: 'absolute',
+    top: 4,
+    left: 6,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  trailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trailDot: {},
+  trailPlayer: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginLeft: 4,
+  },
+  themeScene: {
+    width: 80,
+    height: 52,
+    borderRadius: 8,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeObstacleLeft: {
+    position: 'absolute',
+    left: 20,
+    top: 0,
+    width: 10,
+    height: 18,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+  },
+  themeObstacleRight: {
+    position: 'absolute',
+    left: 20,
+    bottom: 0,
+    width: 10,
+    height: 18,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  themePlayer: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    position: 'absolute',
+    left: 10,
+  },
+  effectRing3: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 1.5,
+  },
+  effectRing2: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1.5,
+  },
+  effectRing1: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+  },
+  effectCore: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  fluxBolts: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+});
+
+// ─── Rarity Badge ─────────────────────────────────────────────────────────────
+function RarityBadge({ rarity, textColor }: { rarity: string; textColor: string }) {
+  const color = RARITY_COLOR[rarity] || RARITY_COLOR.common;
+  return (
+    <View style={badgeStyles.row}>
+      <View style={[badgeStyles.dot, { backgroundColor: color }]} />
+      <Text style={[badgeStyles.text, { color: textColor }]}>{RARITY_LABEL[rarity] || rarity.toUpperCase()}</Text>
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  text: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+});
+
+// ─── Item Card ────────────────────────────────────────────────────────────────
 function ItemCard({
   item,
   isOwned,
@@ -222,6 +415,7 @@ function ItemCard({
   onPurchase,
   onEquip,
   purchasing,
+  theme,
 }: {
   item: StoreItem;
   isOwned: boolean;
@@ -229,21 +423,24 @@ function ItemCard({
   onPurchase: (item: StoreItem) => void;
   onEquip: (item: StoreItem) => void;
   purchasing: boolean;
+  theme: ReturnType<typeof useTheme>;
 }) {
-  const itemNameUpper = item.name.toUpperCase();
-  const priceLabel = item.currency_type === 'iap'
-    ? (item.price_display || `$${(item.price / 100).toFixed(2)}`)
-    : `⚡ ${formatFlux(item.price)}`;
-
-  const btnBg = isEquipped
-    ? C.cyan
-    : isOwned
-    ? 'rgba(255,255,255,0.12)'
-    : item.currency_type === 'iap'
-    ? C.gold
-    : C.cyan;
+  const textColor = theme.dark ? '#ffffff' : '#000000';
+  const secondaryColor = theme.dark ? '#98989D' : '#666666';
+  const isIAP = item.currency_type === 'iap';
+  const priceLabel = isIAP
+    ? (item.price_display || `$${(Number(item.price) / 100).toFixed(2)}`)
+    : `${formatFlux(item.price)} Flux`;
 
   const btnLabel = isEquipped ? 'EQUIPPED' : isOwned ? 'EQUIP' : priceLabel;
+
+  const btnBg = isEquipped
+    ? theme.colors.primary
+    : isOwned
+    ? (theme.dark ? '#1e293b' : '#f1f5f9')
+    : theme.colors.primary;
+
+  const btnTextColor = isOwned && !isEquipped ? textColor : '#ffffff';
 
   function handleBtn() {
     if (isEquipped) return;
@@ -257,53 +454,110 @@ function ItemCard({
   }
 
   return (
-    <AnimPressable onPress={handleBtn} disabled={isEquipped || purchasing} scaleValue={1.03}>
-      <View style={styles.itemCard}>
-        <ItemPreview item={item} />
-        <View style={styles.itemCardMid}>
-          <Text style={styles.itemCardName} numberOfLines={1}>{itemNameUpper}</Text>
-          <RarityBadge rarity={item.rarity} />
+    <AnimPressable onPress={handleBtn} disabled={isEquipped || purchasing} scaleValue={0.97}>
+      <GlassView
+        style={[
+          cardStyles.card,
+          Platform.OS !== 'ios' && {
+            backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+          },
+        ]}
+        glassEffectStyle="regular"
+      >
+        <ItemPreviewComponent item={item} />
+        <View style={cardStyles.info}>
+          <Text style={[cardStyles.name, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
+          <RarityBadge rarity={item.rarity} textColor={secondaryColor} />
         </View>
-        <View style={styles.itemCardBottom}>
-          <View
-            style={[
-              styles.itemCardBtn,
-              {
-                backgroundColor: btnBg,
-                borderColor: isEquipped ? C.cyan : 'transparent',
-                borderWidth: isEquipped ? 1 : 0,
-                shadowColor: isEquipped ? C.cyan : 'transparent',
-                shadowOpacity: isEquipped ? 0.5 : 0,
-                shadowRadius: 6,
-                shadowOffset: { width: 0, height: 0 },
-              },
-            ]}
-          >
+        <View style={cardStyles.btnWrap}>
+          <View style={[cardStyles.btn, { backgroundColor: btnBg }]}>
             {purchasing ? (
               <ActivityIndicator size="small" color="#fff" />
+            ) : isEquipped ? (
+              <View style={cardStyles.btnInner}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={14}
+                  color="#ffffff"
+                />
+                <Text style={[cardStyles.btnText, { color: '#ffffff' }]}>{btnLabel}</Text>
+              </View>
+            ) : isOwned ? (
+              <View style={cardStyles.btnInner}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle"
+                  android_material_icon_name="check-circle-outline"
+                  size={14}
+                  color={btnTextColor}
+                />
+                <Text style={[cardStyles.btnText, { color: btnTextColor }]}>{btnLabel}</Text>
+              </View>
             ) : (
-              <Text style={[styles.itemCardBtnText, isOwned && !isEquipped && { color: C.white }]}>
-                {btnLabel}
-              </Text>
+              <Text style={[cardStyles.btnText, { color: btnTextColor }]}>{btnLabel}</Text>
             )}
           </View>
         </View>
-      </View>
+      </GlassView>
     </AnimPressable>
   );
 }
 
+const cardStyles = StyleSheet.create({
+  card: {
+    width: CARD_WIDTH,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  info: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 4,
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  btnWrap: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    paddingTop: 6,
+  },
+  btn: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  btnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
+
+// ─── Flux Pack Card ───────────────────────────────────────────────────────────
 function FluxPackCard({
   item,
   onPurchase,
   purchasing,
+  theme,
 }: {
   item: StoreItem;
   onPurchase: (item: StoreItem) => void;
   purchasing: boolean;
+  theme: ReturnType<typeof useTheme>;
 }) {
-  const priceLabel = item.price_display || `$${(item.price / 100).toFixed(2)}`;
-  const fluxAmount = item.name.match(/\d[\d,]*/)?.[0] || '???';
+  const textColor = theme.dark ? '#ffffff' : '#000000';
+  const secondaryColor = theme.dark ? '#98989D' : '#666666';
+  const priceLabel = item.price_display || `$${(Number(item.price) / 100).toFixed(2)}`;
+  const fluxMatch = item.name.match(/\d[\d,]*/);
+  const fluxAmount = fluxMatch ? fluxMatch[0] : '???';
 
   function handlePress() {
     console.log('[Store] Flux pack purchase pressed:', item.id, item.name);
@@ -312,32 +566,100 @@ function FluxPackCard({
 
   return (
     <AnimPressable onPress={handlePress} disabled={purchasing}>
-      <View style={styles.fluxPackCard}>
-        <View style={styles.fluxPackLeft}>
-          <Text style={{ fontSize: 32 }}>{item.icon || '⚡'}</Text>
-          <View style={{ marginLeft: 12 }}>
-            <Text style={styles.fluxPackName}>{item.name}</Text>
-            <Text style={styles.fluxPackDesc} numberOfLines={1}>{item.description}</Text>
+      <GlassView
+        style={[
+          packStyles.card,
+          Platform.OS !== 'ios' && {
+            backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+          },
+        ]}
+        glassEffectStyle="regular"
+      >
+        <View style={packStyles.preview}>
+          <FluxPackPreview item={item} />
+        </View>
+        <View style={packStyles.middle}>
+          <Text style={[packStyles.name, { color: textColor }]}>{item.name}</Text>
+          <View style={packStyles.amountRow}>
+            <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={14} color="#f59e0b" />
+            <Text style={packStyles.amount}>{fluxAmount}</Text>
+            <Text style={[packStyles.fluxLabel, { color: secondaryColor }]}>FLUX</Text>
           </View>
+          <Text style={[packStyles.desc, { color: secondaryColor }]} numberOfLines={1}>{item.description}</Text>
         </View>
-        <View style={styles.fluxPackRight}>
-          <Text style={styles.fluxPackAmount}>{fluxAmount}</Text>
-          <Text style={styles.fluxPackFluxLabel}>FLUX</Text>
-        </View>
-        <AnimPressable onPress={handlePress} disabled={purchasing}>
-          <View style={styles.fluxPackBtn}>
+        <View style={packStyles.right}>
+          <View style={[packStyles.btn, { backgroundColor: theme.colors.primary }]}>
             {purchasing ? (
-              <ActivityIndicator size="small" color="#000" />
+              <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.fluxPackBtnText}>{priceLabel}</Text>
+              <Text style={packStyles.btnText}>{priceLabel}</Text>
             )}
           </View>
-        </AnimPressable>
-      </View>
+        </View>
+      </GlassView>
     </AnimPressable>
   );
 }
 
+const packStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
+    padding: 12,
+    gap: 12,
+  },
+  preview: {
+    width: 72,
+    height: 72,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  middle: {
+    flex: 1,
+    gap: 3,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  amount: {
+    color: '#f59e0b',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  fluxLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  desc: {
+    fontSize: 13,
+  },
+  right: {
+    alignItems: 'center',
+  },
+  btn: {
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 64,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});
+
+// ─── Featured Bundle Card ─────────────────────────────────────────────────────
 function FeaturedBundleCard({
   title,
   badge,
@@ -345,11 +667,8 @@ function FeaturedBundleCard({
   contents,
   price,
   btnLabel,
-  gradFrom,
-  gradTo,
-  btnGradFrom,
-  btnGradTo,
   onPress,
+  theme,
 }: {
   title: string;
   badge: string;
@@ -357,23 +676,11 @@ function FeaturedBundleCard({
   contents: string[];
   price: string;
   btnLabel: string;
-  gradFrom: string;
-  gradTo: string;
-  btnGradFrom: string;
-  btnGradTo: string;
   onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
 }) {
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 1800, useNativeDriver: true }),
-      ])
-    ).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const borderOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.9] });
+  const textColor = theme.dark ? '#ffffff' : '#000000';
+  const secondaryColor = theme.dark ? '#98989D' : '#666666';
 
   function handlePress() {
     console.log('[Store] Featured bundle pressed:', title);
@@ -381,58 +688,149 @@ function FeaturedBundleCard({
   }
 
   return (
-    <AnimPressable onPress={handlePress} scaleValue={1.02}>
-      <View style={[styles.featuredCard, { width: SCREEN_WIDTH * 0.85 }]}>
-        <LinearGradient colors={[gradFrom, gradTo]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
-        <Animated.View style={[styles.featuredCardBorder, { opacity: borderOpacity, borderColor: badgeColor }]} />
-        <View style={[styles.featuredBadge, { backgroundColor: `${badgeColor}33`, borderColor: `${badgeColor}88` }]}>
-          <Text style={[styles.featuredBadgeText, { color: badgeColor }]}>{badge}</Text>
+    <AnimPressable onPress={handlePress} scaleValue={0.98}>
+      <GlassView
+        style={[
+          bundleStyles.card,
+          Platform.OS !== 'ios' && {
+            backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+          },
+        ]}
+        glassEffectStyle="regular"
+      >
+        <View style={[bundleStyles.badgeWrap, { backgroundColor: `${badgeColor}22` }]}>
+          <Text style={[bundleStyles.badgeText, { color: badgeColor }]}>{badge}</Text>
         </View>
-        <Text style={styles.featuredTitle}>{title}</Text>
-        <View style={styles.featuredContents}>
+        <Text style={[bundleStyles.title, { color: textColor }]}>{title}</Text>
+        <View style={bundleStyles.contents}>
           {contents.map((c, i) => (
-            <View key={i} style={styles.featuredContentRow}>
-              <Text style={[styles.featuredContentDot, { color: badgeColor }]}>✦</Text>
-              <Text style={styles.featuredContentText}>{c}</Text>
+            <View key={i} style={bundleStyles.contentRow}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check-circle"
+                size={14}
+                color={badgeColor}
+              />
+              <Text style={[bundleStyles.contentText, { color: secondaryColor }]}>{c}</Text>
             </View>
           ))}
         </View>
-        <View style={styles.featuredBottom}>
-          <Text style={styles.featuredPrice}>{price}</Text>
-          <AnimPressable onPress={handlePress}>
-            <LinearGradient colors={[btnGradFrom, btnGradTo]} style={styles.featuredBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.featuredBtnText}>{btnLabel}</Text>
-            </LinearGradient>
-          </AnimPressable>
+        <View style={bundleStyles.bottom}>
+          <Text style={[bundleStyles.price, { color: textColor }]}>{price}</Text>
+          <View style={[bundleStyles.btn, { backgroundColor: theme.colors.primary }]}>
+            <Text style={bundleStyles.btnText}>{btnLabel}</Text>
+          </View>
         </View>
-      </View>
+      </GlassView>
     </AnimPressable>
   );
 }
 
-function DailyStreakDots({ streak, canClaim }: { streak: number; canClaim: boolean }) {
+const bundleStyles = StyleSheet.create({
+  card: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    padding: 20,
+    marginBottom: 12,
+  },
+  badgeWrap: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  contents: {
+    gap: 8,
+    marginBottom: 20,
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  contentText: {
+    fontSize: 15,
+  },
+  bottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  price: {
+    fontSize: 26,
+    fontWeight: '700',
+  },
+  btn: {
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  btnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
+// ─── Daily Streak Dots ────────────────────────────────────────────────────────
+function DailyStreakDots({
+  streak,
+  canClaim,
+  theme,
+}: {
+  streak: number;
+  canClaim: boolean;
+  theme: ReturnType<typeof useTheme>;
+}) {
   const dots = Array.from({ length: 7 }, (_, i) => i);
+  const mutedColor = theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  const mutedTextColor = theme.dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+  const textColor = theme.dark ? '#ffffff' : '#000000';
   return (
-    <View style={styles.streakDots}>
+    <View style={dotStyles.row}>
       {dots.map((i) => {
         const claimed = i < streak;
         const isCurrent = i === streak && canClaim;
-        const dotColor = claimed ? C.gold : isCurrent ? C.cyan : 'rgba(255,255,255,0.15)';
+        const dotBg = claimed
+          ? theme.colors.primary
+          : isCurrent
+          ? 'transparent'
+          : mutedColor;
+        const borderColor = isCurrent ? theme.colors.primary : 'transparent';
+        const numColor = claimed ? '#ffffff' : isCurrent ? theme.colors.primary : mutedTextColor;
         return (
           <View
             key={i}
             style={[
-              styles.streakDot,
+              dotStyles.dot,
               {
-                backgroundColor: dotColor,
-                shadowColor: isCurrent ? C.cyan : claimed ? C.gold : 'transparent',
-                shadowOpacity: isCurrent || claimed ? 0.8 : 0,
-                shadowRadius: 6,
-                shadowOffset: { width: 0, height: 0 },
+                backgroundColor: dotBg,
+                borderColor,
+                borderWidth: isCurrent ? 2 : 0,
               },
             ]}
           >
-            <Text style={styles.streakDotNum}>{i + 1}</Text>
+            {claimed ? (
+              <IconSymbol
+                ios_icon_name="checkmark"
+                android_material_icon_name="check"
+                size={12}
+                color="#ffffff"
+              />
+            ) : (
+              <Text style={[dotStyles.num, { color: numColor }]}>{i + 1}</Text>
+            )}
           </View>
         );
       })}
@@ -440,20 +838,44 @@ function DailyStreakDots({ streak, canClaim }: { streak: number; canClaim: boole
   );
 }
 
+const dotStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  dot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  num: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+});
+
 // ─── Purchase Success Modal ───────────────────────────────────────────────────
 function PurchaseModal({
   visible,
   item,
   onClose,
   onEquip,
+  theme,
 }: {
   visible: boolean;
   item: StoreItem | null;
   onClose: () => void;
   onEquip: (item: StoreItem) => void;
+  theme: ReturnType<typeof useTheme>;
 }) {
   const scale = useRef(new Animated.Value(0.5)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const textColor = theme.dark ? '#ffffff' : '#000000';
+  const secondaryColor = theme.dark ? '#98989D' : '#666666';
 
   useEffect(() => {
     if (visible) {
@@ -469,7 +891,6 @@ function PurchaseModal({
   }, [visible]);
 
   if (!item) return null;
-  const itemNameUpper = item.name.toUpperCase();
 
   function handleEquip() {
     console.log('[Store] Equip Now pressed from purchase modal for item:', item!.id);
@@ -484,43 +905,66 @@ function PurchaseModal({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
-        <Animated.View style={[styles.purchaseModal, { transform: [{ scale }], opacity }]}>
-          <LinearGradient colors={['#0a1a3a', '#050818']} style={StyleSheet.absoluteFill} />
-          <View style={styles.purchaseModalBorder} />
-          <Text style={styles.purchaseCheck}>✓</Text>
-          <Text style={styles.purchaseComplete}>PURCHASE COMPLETE</Text>
-          <Text style={styles.purchaseItemName}>{itemNameUpper} UNLOCKED</Text>
-          <View style={styles.purchaseModalBtns}>
-            <AnimPressable onPress={handleEquip} style={{ flex: 1 }}>
-              <LinearGradient colors={[C.cyan, '#0099cc']} style={styles.purchaseEquipBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Text style={styles.purchaseEquipBtnText}>EQUIP NOW</Text>
-              </LinearGradient>
-            </AnimPressable>
-            <AnimPressable onPress={handleClose} style={{ flex: 1 }}>
-              <View style={styles.purchaseCloseBtn}>
-                <Text style={styles.purchaseCloseBtnText}>CLOSE</Text>
-              </View>
-            </AnimPressable>
-          </View>
+      <View style={modalStyles.overlay}>
+        <Animated.View style={[{ transform: [{ scale }], opacity }]}>
+          <GlassView
+            style={[
+              modalStyles.purchaseCard,
+              Platform.OS !== 'ios' && {
+                backgroundColor: theme.dark ? 'rgba(20,20,30,0.95)' : 'rgba(255,255,255,0.95)',
+              },
+            ]}
+            glassEffectStyle="regular"
+          >
+            <IconSymbol
+              ios_icon_name="checkmark.circle.fill"
+              android_material_icon_name="check-circle"
+              size={56}
+              color={theme.colors.primary}
+            />
+            <Text style={[modalStyles.purchaseTitle, { color: textColor }]}>Purchase Complete</Text>
+            <Text style={[modalStyles.purchaseItemName, { color: theme.colors.primary }]}>{item.name} Unlocked</Text>
+            <View style={modalStyles.purchaseBtns}>
+              <AnimPressable onPress={handleEquip} style={{ flex: 1 }}>
+                <View style={[modalStyles.equipBtn, { backgroundColor: theme.colors.primary }]}>
+                  <Text style={modalStyles.equipBtnText}>Equip Now</Text>
+                </View>
+              </AnimPressable>
+              <AnimPressable onPress={handleClose} style={{ flex: 1 }}>
+                <View
+                  style={[
+                    modalStyles.closeBtn,
+                    { backgroundColor: theme.dark ? '#1e293b' : '#f1f5f9' },
+                  ]}
+                >
+                  <Text style={[modalStyles.closeBtnText, { color: textColor }]}>Close</Text>
+                </View>
+              </AnimPressable>
+            </View>
+          </GlassView>
         </Animated.View>
       </View>
     </Modal>
   );
 }
 
-// ─── Error/Info Modal ─────────────────────────────────────────────────────────
+// ─── Info Modal ───────────────────────────────────────────────────────────────
 function InfoModal({
   visible,
   title,
   message,
   onClose,
+  theme,
 }: {
   visible: boolean;
   title: string;
   message: string;
   onClose: () => void;
+  theme: ReturnType<typeof useTheme>;
 }) {
+  const textColor = theme.dark ? '#ffffff' : '#000000';
+  const secondaryColor = theme.dark ? '#98989D' : '#666666';
+
   function handleClose() {
     console.log('[Store] Info modal closed:', title);
     onClose();
@@ -528,27 +972,122 @@ function InfoModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.infoModal}>
-          <LinearGradient colors={['#0d1f4a', '#050818']} style={StyleSheet.absoluteFill} />
-          <View style={styles.infoModalBorder} />
-          <Text style={styles.infoModalTitle}>{title}</Text>
-          <Text style={styles.infoModalMessage}>{message}</Text>
+      <View style={modalStyles.overlay}>
+        <GlassView
+          style={[
+            modalStyles.infoCard,
+            Platform.OS !== 'ios' && {
+              backgroundColor: theme.dark ? 'rgba(20,20,30,0.95)' : 'rgba(255,255,255,0.95)',
+            },
+          ]}
+          glassEffectStyle="regular"
+        >
+          <Text style={[modalStyles.infoTitle, { color: textColor }]}>{title}</Text>
+          <Text style={[modalStyles.infoMessage, { color: secondaryColor }]}>{message}</Text>
           <AnimPressable onPress={handleClose}>
-            <LinearGradient colors={[C.cyan, '#0099cc']} style={styles.infoModalBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.infoModalBtnText}>OK</Text>
-            </LinearGradient>
+            <View style={[modalStyles.infoBtn, { backgroundColor: theme.colors.primary }]}>
+              <Text style={modalStyles.infoBtnText}>OK</Text>
+            </View>
           </AnimPressable>
-        </View>
+        </GlassView>
       </View>
     </Modal>
   );
 }
 
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  purchaseCard: {
+    width: SCREEN_WIDTH - 48,
+    maxWidth: 360,
+    borderRadius: 24,
+    overflow: 'hidden',
+    padding: 32,
+    alignItems: 'center',
+    gap: 8,
+  },
+  purchaseTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  purchaseItemName: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  purchaseBtns: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  equipBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  equipBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  closeBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  infoCard: {
+    width: SCREEN_WIDTH - 48,
+    maxWidth: 360,
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 28,
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  infoMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  infoBtn: {
+    borderRadius: 12,
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+  },
+  infoBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+});
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function StoreScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+
+  const textColor = theme.dark ? '#ffffff' : '#000000';
+  const secondaryColor = theme.dark ? '#98989D' : '#666666';
 
   const [activeTab, setActiveTab] = useState<TabName>('Featured');
   const tabFade = useRef(new Animated.Value(1)).current;
@@ -715,7 +1254,7 @@ export default function StoreScreen() {
       setDailyStreak((prev) => prev ? { ...prev, canClaimToday: false, currentStreak: result.newStreak } : null);
       if (result.reward.type === 'flux') {
         setUserStats((prev) => prev ? { ...prev, totalCoins: prev.totalCoins + result.reward.value } : null);
-        showInfo('Daily Reward Claimed!', `You received ⚡ ${formatFlux(result.reward.value)} Flux!`);
+        showInfo('Daily Reward Claimed!', `You received ${formatFlux(result.reward.value)} Flux!`);
       } else {
         showInfo('Daily Reward Claimed!', 'Your reward has been added to your collection!');
       }
@@ -749,11 +1288,10 @@ export default function StoreScreen() {
   // ─── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={styles.root}>
-        <LinearGradient colors={['#050818', '#0a0f2e', '#050818']} style={StyleSheet.absoluteFill} />
-        <View style={[styles.loadingWrap, { paddingTop: insets.top }]}>
-          <ActivityIndicator size="large" color={C.cyan} />
-          <Text style={styles.loadingText}>Loading Store...</Text>
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: secondaryColor }]}>Loading Store...</Text>
         </View>
       </View>
     );
@@ -762,39 +1300,53 @@ export default function StoreScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <LinearGradient colors={['#050818', '#0a0f2e', '#050818']} style={StyleSheet.absoluteFill} />
-
       <PurchaseModal
         visible={purchaseModal.visible}
         item={purchaseModal.item}
         onClose={() => setPurchaseModal({ visible: false, item: null })}
         onEquip={handleEquip}
+        theme={theme}
       />
       <InfoModal
         visible={infoModal.visible}
         title={infoModal.title}
         message={infoModal.message}
         onClose={() => setInfoModal({ visible: false, title: '', message: '' })}
+        theme={theme}
       />
 
       {/* Top Bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.fluxBadge}>
-          <Text style={styles.fluxIcon}>⚡</Text>
-          <Text style={styles.fluxAmount}>{fluxDisplay}</Text>
+      <GlassView
+        style={[
+          styles.topBar,
+          { paddingTop: insets.top + 8 },
+          Platform.OS !== 'ios' && {
+            backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+          },
+        ]}
+        glassEffectStyle="regular"
+      >
+        <View style={styles.fluxPill}>
+          <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={16} color="#f59e0b" />
+          <Text style={[styles.fluxAmount, { color: textColor }]}>{fluxDisplay}</Text>
         </View>
+        <Text style={[styles.storeTitle, { color: textColor }]}>Store</Text>
         <View style={styles.topBarRight}>
-          <AnimPressable onPress={() => { console.log('[Store] Settings pressed'); }} style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>⚙</Text>
+          <AnimPressable onPress={() => { console.log('[Store] Settings pressed'); }}>
+            <View style={[styles.iconBtn, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+              <IconSymbol ios_icon_name="gearshape.fill" android_material_icon_name="settings" size={18} color={secondaryColor} />
+            </View>
           </AnimPressable>
-          <AnimPressable onPress={() => { console.log('[Store] Restore purchases pressed'); }} style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>↺</Text>
+          <AnimPressable onPress={() => { console.log('[Store] Restore purchases pressed'); }}>
+            <View style={[styles.iconBtn, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+              <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="restore" size={18} color={secondaryColor} />
+            </View>
           </AnimPressable>
         </View>
-      </View>
+      </GlassView>
 
       {/* Tab Bar */}
-      <View style={styles.tabBarWrap}>
+      <View style={[styles.tabBarWrap, { borderBottomColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -805,11 +1357,18 @@ export default function StoreScreen() {
             return (
               <AnimPressable key={tab} onPress={() => switchTab(tab)}>
                 <View style={styles.tabItem}>
-                  <Text style={[styles.tabLabel, isActive ? styles.tabLabelActive : styles.tabLabelInactive]}>
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      isActive
+                        ? [styles.tabLabelActive, { color: textColor }]
+                        : [styles.tabLabelInactive, { color: secondaryColor }],
+                    ]}
+                  >
                     {tab}
                   </Text>
                   {isActive && (
-                    <View style={styles.tabUnderline} />
+                    <View style={[styles.tabUnderline, { backgroundColor: theme.colors.primary }]} />
                   )}
                 </View>
               </AnimPressable>
@@ -822,53 +1381,36 @@ export default function StoreScreen() {
       <Animated.View style={[{ flex: 1 }, { opacity: tabFade }]}>
         {activeTab === 'Featured' && (
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Bundle Carousel */}
-            <Text style={styles.sectionTitle}>BUNDLES</Text>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 8 }}
-            >
-              <View style={{ paddingHorizontal: 8 }}>
-                <FeaturedBundleCard
-                  title="STARTER PACK"
-                  badge="BEST VALUE"
-                  badgeColor={C.gold}
-                  contents={['Singularity Core skin', 'RGB Spectrum Trail', '2000 Flux']}
-                  price="$3.99"
-                  btnLabel="GET STARTER PACK"
-                  gradFrom="#1a0533"
-                  gradTo="#0d1f4a"
-                  btnGradFrom="#f59e0b"
-                  btnGradTo="#d97706"
-                  onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
-                />
-              </View>
-              <View style={{ paddingHorizontal: 8 }}>
-                <FeaturedBundleCard
-                  title="PREMIUM BUNDLE"
-                  badge="MOST POPULAR"
-                  badgeColor={C.purple}
-                  contents={['Celestial Reactor skin', 'Plasma Storm Trail', 'Deep Space Theme', '5000 Flux']}
-                  price="$7.99"
-                  btnLabel="GET PREMIUM BUNDLE"
-                  gradFrom="#0d1f4a"
-                  gradTo="#1a0533"
-                  btnGradFrom="#a855f7"
-                  btnGradTo="#7c3aed"
-                  onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
-                />
-              </View>
-            </ScrollView>
+            {/* Bundles */}
+            <Text style={[styles.sectionLabel, { color: secondaryColor }]}>BUNDLES</Text>
+            <FeaturedBundleCard
+              title="Starter Pack"
+              badge="BEST VALUE"
+              badgeColor="#f59e0b"
+              contents={['Singularity Core skin', 'RGB Spectrum Trail', '2,000 Flux']}
+              price="$3.99"
+              btnLabel="Get Starter Pack"
+              onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
+              theme={theme}
+            />
+            <FeaturedBundleCard
+              title="Premium Bundle"
+              badge="MOST POPULAR"
+              badgeColor="#a855f7"
+              contents={['Celestial Reactor skin', 'Plasma Storm Trail', 'Deep Space Theme', '5,000 Flux']}
+              price="$7.99"
+              btnLabel="Get Premium Bundle"
+              onPress={() => showInfo('Coming Soon', 'Bundle purchases will be available soon!')}
+              theme={theme}
+            />
 
             {/* Featured Items Grid */}
-            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>FEATURED ITEMS</Text>
+            <Text style={[styles.sectionLabel, { color: secondaryColor, marginTop: 8 }]}>FEATURED ITEMS</Text>
             {tabItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>✦</Text>
-                <Text style={styles.emptyStateText}>No featured items yet</Text>
-                <Text style={styles.emptyStateSubtext}>Check back soon for legendary drops</Text>
+                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={40} color={secondaryColor} />
+                <Text style={[styles.emptyText, { color: textColor }]}>No featured items yet</Text>
+                <Text style={[styles.emptySubtext, { color: secondaryColor }]}>Check back soon for legendary drops</Text>
               </View>
             ) : (
               <View style={styles.grid}>
@@ -881,6 +1423,7 @@ export default function StoreScreen() {
                     onPurchase={handlePurchase}
                     onEquip={handleEquip}
                     purchasing={purchasing === item.id}
+                    theme={theme}
                   />
                 ))}
               </View>
@@ -890,12 +1433,12 @@ export default function StoreScreen() {
 
         {(activeTab === 'Skins' || activeTab === 'Trails' || activeTab === 'Themes' || activeTab === 'Effects') && (
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionTitle}>{activeTab.toUpperCase()}</Text>
+            <Text style={[styles.sectionLabel, { color: secondaryColor }]}>{activeTab.toUpperCase()}</Text>
             {tabItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>✦</Text>
-                <Text style={styles.emptyStateText}>No {activeTab.toLowerCase()} yet</Text>
-                <Text style={styles.emptyStateSubtext}>New items drop regularly</Text>
+                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={40} color={secondaryColor} />
+                <Text style={[styles.emptyText, { color: textColor }]}>No {activeTab.toLowerCase()} yet</Text>
+                <Text style={[styles.emptySubtext, { color: secondaryColor }]}>New items drop regularly</Text>
               </View>
             ) : (
               <View style={styles.grid}>
@@ -908,6 +1451,7 @@ export default function StoreScreen() {
                     onPurchase={handlePurchase}
                     onEquip={handleEquip}
                     purchasing={purchasing === item.id}
+                    theme={theme}
                   />
                 ))}
               </View>
@@ -917,13 +1461,13 @@ export default function StoreScreen() {
 
         {activeTab === 'Premium' && (
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionTitle}>FLUX PACKS</Text>
-            <Text style={styles.sectionSubtitle}>Top up your Flux balance</Text>
+            <Text style={[styles.sectionLabel, { color: secondaryColor }]}>FLUX PACKS</Text>
+            <Text style={[styles.sectionSubtitle, { color: secondaryColor }]}>Top up your Flux balance</Text>
             {tabItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>⚡</Text>
-                <Text style={styles.emptyStateText}>No packs available</Text>
-                <Text style={styles.emptyStateSubtext}>Check back soon</Text>
+                <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={40} color={secondaryColor} />
+                <Text style={[styles.emptyText, { color: textColor }]}>No packs available</Text>
+                <Text style={[styles.emptySubtext, { color: secondaryColor }]}>Check back soon</Text>
               </View>
             ) : (
               <View style={{ gap: 12 }}>
@@ -933,6 +1477,7 @@ export default function StoreScreen() {
                     item={item}
                     onPurchase={handlePurchase}
                     purchasing={purchasing === item.id}
+                    theme={theme}
                   />
                 ))}
               </View>
@@ -943,31 +1488,40 @@ export default function StoreScreen() {
         {activeTab === 'Daily' && (
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Daily Reward Panel */}
-            <View style={styles.dailyCard}>
-              <LinearGradient colors={['#0a1a3a', '#050818']} style={StyleSheet.absoluteFill} />
-              <View style={styles.dailyCardBorder} />
-              <Text style={styles.dailyTitle}>DAILY REWARD</Text>
+            <GlassView
+              style={[
+                styles.dailyCard,
+                Platform.OS !== 'ios' && {
+                  backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                },
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.dailyTitleRow}>
+                <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={20} color={theme.colors.primary} />
+                <Text style={[styles.dailyTitle, { color: textColor }]}>Daily Reward</Text>
+              </View>
+
               {!user ? (
                 <View style={styles.dailySignIn}>
-                  <Text style={styles.dailySignInText}>Sign in to claim daily rewards</Text>
+                  <Text style={[styles.dailySignInText, { color: secondaryColor }]}>Sign in to claim daily rewards</Text>
                 </View>
               ) : (
                 <>
                   <DailyStreakDots
                     streak={dailyStreak?.currentStreak ?? 0}
                     canClaim={dailyStreak?.canClaimToday ?? false}
+                    theme={theme}
                   />
                   <View style={styles.dailyStreakRow}>
-                    <Text style={styles.dailyStreakNum}>{dailyStreak?.currentStreak ?? 0}</Text>
-                    <Text style={styles.dailyStreakLabel}>DAY STREAK</Text>
+                    <Text style={[styles.dailyStreakNum, { color: theme.colors.primary }]}>{dailyStreak?.currentStreak ?? 0}</Text>
+                    <Text style={[styles.dailyStreakLabel, { color: secondaryColor }]}>DAY STREAK</Text>
                   </View>
                   {dailyStreak?.nextReward && (
-                    <View style={styles.dailyRewardPreview}>
-                      <Text style={styles.dailyRewardIcon}>⚡</Text>
-                      <Text style={styles.dailyRewardValue}>
-                        {formatFlux(dailyStreak.nextReward.value)}
-                      </Text>
-                      <Text style={styles.dailyRewardType}>FLUX</Text>
+                    <View style={[styles.dailyRewardPreview, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                      <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="flash-on" size={20} color="#f59e0b" />
+                      <Text style={styles.dailyRewardValue}>{formatFlux(dailyStreak.nextReward.value)}</Text>
+                      <Text style={[styles.dailyRewardType, { color: secondaryColor }]}>FLUX</Text>
                     </View>
                   )}
                   <Animated.View style={{ transform: [{ scale: claimPulse }] }}>
@@ -975,25 +1529,30 @@ export default function StoreScreen() {
                       onPress={handleClaimDaily}
                       disabled={!dailyStreak?.canClaimToday || claimingDaily}
                     >
-                      <LinearGradient
-                        colors={dailyStreak?.canClaimToday ? [C.cyan, '#0099cc'] : ['#1a2a3a', '#0d1a2a']}
-                        style={[styles.claimBtn, !dailyStreak?.canClaimToday && { opacity: 0.5 }]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
+                      <View
+                        style={[
+                          styles.claimBtn,
+                          {
+                            backgroundColor: dailyStreak?.canClaimToday
+                              ? theme.colors.primary
+                              : (theme.dark ? '#1e293b' : '#e2e8f0'),
+                            opacity: dailyStreak?.canClaimToday ? 1 : 0.6,
+                          },
+                        ]}
                       >
                         {claimingDaily ? (
-                          <ActivityIndicator size="small" color="#000" />
+                          <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                          <Text style={[styles.claimBtnText, !dailyStreak?.canClaimToday && { color: C.whiteFaded }]}>
-                            {dailyStreak?.canClaimToday ? 'CLAIM REWARD' : 'ALREADY CLAIMED'}
+                          <Text style={[styles.claimBtnText, { color: dailyStreak?.canClaimToday ? '#ffffff' : secondaryColor }]}>
+                            {dailyStreak?.canClaimToday ? 'Claim Reward' : 'Already Claimed'}
                           </Text>
                         )}
-                      </LinearGradient>
+                      </View>
                     </AnimPressable>
                   </Animated.View>
                 </>
               )}
-            </View>
+            </GlassView>
 
             {/* Daily Discount */}
             {items.length > 0 && (() => {
@@ -1002,30 +1561,39 @@ export default function StoreScreen() {
               const discountedPrice = Math.floor(discountItem.price * (1 - discountPct / 100));
               const discountedDisplay = discountItem.currency_type === 'iap'
                 ? `$${(discountedPrice / 100).toFixed(2)}`
-                : `⚡ ${formatFlux(discountedPrice)}`;
+                : `${formatFlux(discountedPrice)} Flux`;
               const originalDisplay = discountItem.currency_type === 'iap'
-                ? (discountItem.price_display || `$${(discountItem.price / 100).toFixed(2)}`)
-                : `⚡ ${formatFlux(discountItem.price)}`;
+                ? (discountItem.price_display || `$${(Number(discountItem.price) / 100).toFixed(2)}`)
+                : `${formatFlux(discountItem.price)} Flux`;
               return (
-                <View style={styles.discountCard}>
-                  <LinearGradient colors={['#1a0533', '#0a0f2e']} style={StyleSheet.absoluteFill} />
-                  <View style={styles.discountBadge}>
+                <GlassView
+                  style={[
+                    styles.discountCard,
+                    Platform.OS !== 'ios' && {
+                      backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                    },
+                  ]}
+                  glassEffectStyle="regular"
+                >
+                  <View style={[styles.discountBadge, { backgroundColor: '#a855f7' }]}>
                     <Text style={styles.discountBadgeText}>-{discountPct}%</Text>
                   </View>
-                  <Text style={styles.discountLabel}>DAILY DEAL</Text>
+                  <Text style={[styles.discountLabel, { color: secondaryColor }]}>DAILY DEAL</Text>
                   <View style={styles.discountRow}>
-                    <Text style={{ fontSize: 36 }}>{discountItem.icon || '✦'}</Text>
+                    <View style={styles.discountPreview}>
+                      <ItemPreviewComponent item={discountItem} />
+                    </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.discountItemName}>{discountItem.name.toUpperCase()}</Text>
-                      <RarityBadge rarity={discountItem.rarity} />
+                      <Text style={[styles.discountItemName, { color: textColor }]}>{discountItem.name}</Text>
+                      <RarityBadge rarity={discountItem.rarity} textColor={secondaryColor} />
                     </View>
                     <View style={styles.discountPriceCol}>
-                      <Text style={styles.discountOldPrice}>{originalDisplay}</Text>
-                      <Text style={styles.discountNewPrice}>{discountedDisplay}</Text>
+                      <Text style={[styles.discountOldPrice, { color: secondaryColor }]}>{originalDisplay}</Text>
+                      <Text style={[styles.discountNewPrice, { color: theme.colors.primary }]}>{discountedDisplay}</Text>
                     </View>
                   </View>
-                  <Text style={styles.discountRefresh}>Refreshes in 12h 00m</Text>
-                </View>
+                  <Text style={[styles.discountRefresh, { color: secondaryColor }]}>Refreshes in 12h 00m</Text>
+                </GlassView>
               );
             })()}
           </ScrollView>
@@ -1039,7 +1607,6 @@ export default function StoreScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#050818',
   },
   loadingWrap: {
     flex: 1,
@@ -1048,10 +1615,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
-    color: C.cyan,
     fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 2,
+    fontWeight: '500',
   },
 
   // Top Bar
@@ -1061,55 +1626,42 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,245,255,0.15)',
-    backgroundColor: 'rgba(5,8,24,0.9)',
+    overflow: 'hidden',
   },
-  fluxBadge: {
+  storeTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+  },
+  fluxPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,245,255,0.1)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,245,255,0.3)',
     gap: 6,
-  },
-  fluxIcon: {
-    fontSize: 16,
-    color: C.gold,
+    zIndex: 1,
   },
   fluxAmount: {
-    color: C.white,
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.5,
   },
   topBarRight: {
     flexDirection: 'row',
     gap: 8,
+    zIndex: 1,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  iconBtnText: {
-    color: C.white,
-    fontSize: 18,
   },
 
   // Tab Bar
   tabBarWrap: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: 'rgba(5,8,24,0.8)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tabBarContent: {
     paddingHorizontal: 12,
@@ -1122,28 +1674,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontSize: 14,
+    fontWeight: '500',
   },
   tabLabelActive: {
-    color: C.white,
+    fontWeight: '700',
   },
-  tabLabelInactive: {
-    color: C.whiteFaded,
-  },
+  tabLabelInactive: {},
   tabUnderline: {
     position: 'absolute',
     bottom: 0,
     left: 8,
     right: 8,
     height: 2,
-    backgroundColor: C.cyan,
     borderRadius: 1,
-    shadowColor: C.cyan,
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
   },
 
   // Scroll content
@@ -1151,19 +1695,16 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 120,
   },
-  sectionTitle: {
-    color: C.white,
-    fontSize: 13,
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1,
     marginBottom: 12,
-    opacity: 0.7,
   },
   sectionSubtitle: {
-    color: C.whiteFaded,
-    fontSize: 13,
+    fontSize: 14,
     marginBottom: 16,
-    marginTop: -8,
+    marginTop: -6,
   },
 
   // Grid
@@ -1173,253 +1714,30 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  // Item Card
-  itemCard: {
-    width: CARD_WIDTH,
-    height: 200,
-    borderRadius: 16,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.surfaceBorder,
-    overflow: 'hidden',
-  },
-  previewArea: {
-    height: 110,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemCardMid: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 4,
-  },
-  itemCardName: {
-    color: C.white,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  rarityBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  rarityText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  itemCardBottom: {
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  itemCardBtn: {
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemCardBtnText: {
-    color: '#000',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  // Flux Pack Card
-  fluxPackCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: `${C.gold}44`,
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-  },
-  fluxPackLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  fluxPackName: {
-    color: C.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  fluxPackDesc: {
-    color: C.whiteFaded,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  fluxPackRight: {
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  fluxPackAmount: {
-    color: C.gold,
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  fluxPackFluxLabel: {
-    color: C.gold,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    opacity: 0.7,
-  },
-  fluxPackBtn: {
-    backgroundColor: C.gold,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    minWidth: 64,
-    alignItems: 'center',
-  },
-  fluxPackBtnText: {
-    color: '#000',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  // Featured Card
-  featuredCard: {
-    height: SCREEN_HEIGHT * 0.48,
-    borderRadius: 20,
-    overflow: 'hidden',
-    padding: 24,
-    justifyContent: 'flex-end',
-  },
-  featuredCardBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-    borderWidth: 1.5,
-  },
-  featuredBadge: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  featuredBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  featuredTitle: {
-    color: C.white,
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 12,
-  },
-  featuredContents: {
-    gap: 6,
-    marginBottom: 20,
-  },
-  featuredContentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  featuredContentDot: {
-    fontSize: 10,
-  },
-  featuredContentText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  featuredBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  featuredPrice: {
-    color: C.white,
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  featuredBtn: {
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  featuredBtnText: {
-    color: '#000',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-
   // Daily
   dailyCard: {
     borderRadius: 20,
     overflow: 'hidden',
-    padding: 24,
+    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: `${C.cyan}44`,
   },
-  dailyCardBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: `${C.cyan}33`,
+  dailyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
   },
   dailyTitle: {
-    color: C.cyan,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 3,
-    marginBottom: 20,
+    fontSize: 18,
+    fontWeight: '700',
   },
   dailySignIn: {
     paddingVertical: 20,
     alignItems: 'center',
   },
   dailySignInText: {
-    color: C.whiteFaded,
     fontSize: 15,
     textAlign: 'center',
-  },
-  streakDots: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-    flexWrap: 'wrap',
-  },
-  streakDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  streakDotNum: {
-    color: '#000',
-    fontSize: 12,
-    fontWeight: '800',
   },
   dailyStreakRow: {
     flexDirection: 'row',
@@ -1428,40 +1746,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dailyStreakNum: {
-    color: C.gold,
     fontSize: 48,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   dailyStreakLabel: {
-    color: C.whiteFaded,
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   dailyRewardPreview: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 20,
-    backgroundColor: 'rgba(0,245,255,0.08)',
     borderRadius: 12,
     padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0,245,255,0.2)',
-  },
-  dailyRewardIcon: {
-    fontSize: 24,
   },
   dailyRewardValue: {
-    color: C.gold,
+    color: '#f59e0b',
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   dailyRewardType: {
-    color: C.whiteFaded,
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   claimBtn: {
     borderRadius: 14,
@@ -1469,10 +1778,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   claimBtnText: {
-    color: '#000',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1.5,
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   // Discount Card
@@ -1480,28 +1787,24 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     padding: 20,
-    borderWidth: 1,
-    borderColor: `${C.purple}44`,
   },
   discountBadge: {
     position: 'absolute',
     top: 16,
     right: 16,
-    backgroundColor: C.purple,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   discountBadgeText: {
-    color: C.white,
+    color: '#ffffff',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   discountLabel: {
-    color: C.purple,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
+    fontWeight: '700',
+    letterSpacing: 1,
     marginBottom: 16,
   },
   discountRow: {
@@ -1509,153 +1812,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  discountPreview: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
   discountItemName: {
-    color: C.white,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     marginBottom: 4,
   },
   discountPriceCol: {
     alignItems: 'flex-end',
   },
   discountOldPrice: {
-    color: C.whiteFaded,
     fontSize: 13,
     textDecorationLine: 'line-through',
   },
   discountNewPrice: {
-    color: C.cyan,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '700',
   },
   discountRefresh: {
-    color: C.whiteFaded,
     fontSize: 12,
     textAlign: 'right',
-  },
-
-  // Purchase Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  purchaseModal: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 24,
-    overflow: 'hidden',
-    padding: 32,
-    alignItems: 'center',
-    gap: 8,
-  },
-  purchaseModalBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: `${C.cyan}66`,
-  },
-  purchaseCheck: {
-    color: C.cyan,
-    fontSize: 48,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  purchaseComplete: {
-    color: C.cyan,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  purchaseItemName: {
-    color: C.gold,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  purchaseModalBtns: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  purchaseEquipBtn: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  purchaseEquipBtnText: {
-    color: '#000',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  purchaseCloseBtn: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  purchaseCloseBtnText: {
-    color: C.whiteFaded,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  // Info Modal
-  infoModal: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 20,
-    overflow: 'hidden',
-    padding: 28,
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoModalBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  infoModalTitle: {
-    color: C.white,
-    fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  infoModalMessage: {
-    color: C.whiteFaded,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  infoModalBtn: {
-    borderRadius: 12,
-    paddingHorizontal: 40,
-    paddingVertical: 12,
-  },
-  infoModalBtnText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
 
   // Empty state
@@ -1664,18 +1846,12 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     gap: 8,
   },
-  emptyStateIcon: {
-    fontSize: 40,
-    color: C.whiteFaded,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    color: C.white,
+  emptyText: {
     fontSize: 17,
     fontWeight: '600',
+    marginTop: 8,
   },
-  emptyStateSubtext: {
-    color: C.whiteFaded,
+  emptySubtext: {
     fontSize: 14,
   },
 });
