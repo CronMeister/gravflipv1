@@ -239,14 +239,20 @@ export default function HomeScreen() {
       } else if (obstacle.type === 'wall' && obstacle.wallY !== undefined && obstacle.wallGapX !== undefined) {
         const wallTop = obstacle.wallY;
         const wallBottom = obstacle.wallY + WALL_OBSTACLE_HEIGHT;
-        const wallLeft = obstacle.x;
-        const wallRight = obstacle.x + SCREEN_WIDTH;
-        const gapLeft = obstacle.wallGapX;
-        const gapRight = obstacle.wallGapX + WALL_GAP_SIZE;
+        // Gap is rendered at `obstacle.x + obstacle.wallGapX` and moves with the wall.
+        const gapLeft = obstacle.x + obstacle.wallGapX;
+        const gapRight = gapLeft + WALL_GAP_SIZE;
 
+        // Only check vertical overlap with wall band first.
         if (playerBottom > wallTop && playerTop < wallBottom) {
-          const playerCenterX = playerLeft + PLAYER_SIZE / 2;
-          if (playerCenterX < gapLeft || playerCenterX > gapRight) {
+          // Wall segments exist on the left side [0, gapLeft] and right side [gapRight, SCREEN_WIDTH].
+          // Player collides if their body overlaps either segment.
+          const hitsLeftSegment = playerLeft < gapLeft && playerRight > 0;
+          const hitsRightSegment = playerRight > gapRight && playerLeft < SCREEN_WIDTH;
+          // But we only care about overlap if the wall is currently in the player's vicinity at all.
+          // Simplification: player collides with the wall iff their horizontal body is NOT fully inside the gap.
+          const fullyInsideGap = playerLeft >= gapLeft && playerRight <= gapRight;
+          if (!fullyInsideGap && (hitsLeftSegment || hitsRightSegment)) {
             return true;
           }
         }
