@@ -233,3 +233,30 @@ export const authenticatedDelete = async <T = any>(endpoint: string, data: any =
     body: JSON.stringify(data),
   });
 };
+
+/**
+ * GET request with X-Device-Id header (no auth required)
+ */
+export const apiGetWithDevice = async <T = any>(endpoint: string): Promise<T> => {
+  const { getDeviceId } = await import("@/utils/deviceId");
+  const deviceId = await getDeviceId();
+  console.log("[API] apiGetWithDevice:", endpoint, "deviceId:", deviceId);
+  return apiCall<T>(endpoint, {
+    method: "GET",
+    headers: { "X-Device-Id": deviceId },
+  });
+};
+
+/**
+ * POST request with X-Device-Id header (no auth required)
+ */
+export const apiPostWithDevice = async <T = any>(endpoint: string, data: any): Promise<T> => {
+  const { getDeviceId } = await import("@/utils/deviceId");
+  const deviceId = await getDeviceId();
+  console.log("[API] apiPostWithDevice:", endpoint, "deviceId:", deviceId, "data:", data);
+  return apiCall<T>(endpoint, {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: { "X-Device-Id": deviceId },
+  });
+};

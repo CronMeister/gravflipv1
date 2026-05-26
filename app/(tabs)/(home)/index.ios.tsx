@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, ScrollView } from "react-native";
 import { useTheme } from "@react-navigation/native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,7 +14,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { IconSymbol } from "@/components/IconSymbol";
 import { GlassView } from "expo-glass-effect";
-import { apiGet, authenticatedGet, authenticatedPost } from "@/utils/api";
+import { apiGet, authenticatedGet, authenticatedPost, apiGetWithDevice, apiPostWithDevice } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -78,6 +78,19 @@ interface DailyObjective {
   completed: boolean;
 }
 
+interface ObjectivesResponse {
+  objective: {
+    id: string;
+    title: string;
+    description: string;
+    targetValue: number;
+    rewardCoins: number;
+    icon: string;
+  };
+  progress: number;
+  completed: boolean;
+}
+
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -107,59 +120,50 @@ export default function HomeScreen() {
     };
   });
 
-  const loadGameData = useCallback(async () => {
-    console.log('[API] Loading game data...');
+  const loadStats = useCallback(async () => {
+    if (!user) return;
+    console.log('[API] Loading stats (authenticated)...');
     try {
-      // Fetch high score from stats (authenticated)
-      if (user) {
-        try {
-          const stats = await authenticatedGet<{ highScore: number; weeklyScore: number }>('/api/stats');
-          console.log('[API] Stats loaded:', stats);
-          setHighScore(stats.highScore || 0);
-        } catch (statsError) {
-          console.error('[API] Error loading stats:', statsError);
-        }
-
-        // Fetch daily objectives (authenticated)
-        try {
-          const objectivesData = await authenticatedGet<{
-            objective: {
-              id: string;
-              title: string;
-              description: string;
-              targetValue: number;
-              rewardCoins: number;
-              icon: string;
-            };
-            userProgress: {
-              progress: number;
-              completed: boolean;
-            };
-          }[]>('/api/objectives/daily');
-          console.log('[API] Daily objectives loaded:', objectivesData);
-          const mapped: DailyObjective[] = objectivesData.map((item) => ({
-            id: item.objective.id,
-            title: item.objective.title,
-            description: item.objective.description,
-            targetValue: item.objective.targetValue,
-            rewardCoins: item.objective.rewardCoins,
-            icon: item.objective.icon || 'star',
-            progress: item.userProgress?.progress || 0,
-            completed: item.userProgress?.completed || false,
-          }));
-          setDailyObjectives(mapped);
-        } catch (objError) {
-          console.error('[API] Error loading objectives:', objError);
-        }
-      }
-    } catch (error) {
-      console.error('[API] Error loading game data:', error);
+      const stats = await authenticatedGet<{ highScore: number; weeklyScore: number }>('/api/stats');
+      console.log('[API] Stats loaded:', stats);
+      setHighScore(stats.highScore || 0);
+    } catch (statsError) {
+      console.error('[API] Error loading stats:', statsError);
     }
   }, [user]);
 
+  const loadObjectives = useCallback(async () => {
+    console.log('[API] Loading daily objectives (device-id)...');
+    try {
+      const objectivesData = await apiGetWithDevice<ObjectivesResponse[]>('/api/objectives/daily');
+      console.log('[API] Daily objectives loaded:', objectivesData);
+      if (Array.isArray(objectivesData)) {
+        const mapped: DailyObjective[] = objectivesData.map((item) => ({
+          id: item.objective.id,
+          title: item.objective.title,
+          description: item.objective.description,
+          targetValue: item.objective.targetValue,
+          rewardCoins: item.objective.rewardCoins,
+          icon: item.objective.icon || 'star',
+          progress: item.progress || 0,
+          completed: item.completed || false,
+        }));
+        setDailyObjectives(mapped);
+      }
+    } catch (objError) {
+      console.error('[API] Error loading objectives:', objError);
+    }
+  }, []);
+
   useEffect(() => {
-    loadGameData();
-  }, [loadGameData]);
+    loadStats();
+  }, [loadStats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadObjectives();
+    }, [loadObjectives])
+  );
 
   const flipGravity = () => {
     if (!gameStarted || gameOver) return;
@@ -219,6 +223,27 @@ export default function HomeScreen() {
     } else if (finalScore > highScore) {
       setHighScore(finalScore);
     }
+
+    // Submit run progress to objectives (device-id, always — even zero-score runs)
+    console.log('[API] Submitting objectives progress, runScore:', finalScore);
+    apiPostWithDevice<ObjectivesResponse[]>('/api/objectives/progress', { runScore: finalScore })
+      .then((updated) => {
+        console.log('[API] Objectives progress updated:', updated);
+        if (Array.isArray(updated)) {
+          const mapped: DailyObjective[] = updated.map((item) => ({
+            id: item.objective.id,
+            title: item.objective.title,
+            description: item.objective.description,
+            targetValue: item.objective.targetValue,
+            rewardCoins: item.objective.rewardCoins,
+            icon: item.objective.icon || 'star',
+            progress: item.progress || 0,
+            completed: item.completed || false,
+          }));
+          setDailyObjectives(mapped);
+        }
+      })
+      .catch((e) => console.warn('[API] objectives progress failed:', e));
   };
 
   const checkCollision = (playerYPos: number, obstaclesList: Obstacle[]) => {
