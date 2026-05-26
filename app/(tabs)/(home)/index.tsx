@@ -563,10 +563,7 @@ export default function HomeScreen() {
       {!gameStarted && !gameOver && (
         <ScrollView 
           style={styles.menuScrollView}
-          contentContainerStyle={[
-            styles.menuContainer,
-            Platform.OS !== 'ios' && styles.menuContainerWithTabBar
-          ]}
+          contentContainerStyle={styles.menuContainer}
         >
           <Text style={[styles.title, { color: textColor }]}>GravFlip</Text>
           
@@ -746,9 +743,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 40,
-  },
-  menuContainerWithTabBar: {
-    paddingBottom: 120,
   },
   title: {
     fontSize: 48,

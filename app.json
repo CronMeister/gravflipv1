@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "gravflip",
-    "slug": "gravflip",
+    "name": "Remix of gravflip",
+    "slug": "remix-of-gravflip",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/GravFlip.png",
@@ -36,7 +36,7 @@
       "expo-router",
       "expo-web-browser"
     ],
-    "scheme": "gravflip",
+    "scheme": "remixofgravflip",
     "experiments": {
       "typedRoutes": true
     },
