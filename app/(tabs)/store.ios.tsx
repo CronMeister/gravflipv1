@@ -43,14 +43,14 @@ interface StoreItem {
   name: string;
   description: string;
   price: number;
-  price_display: string | null;
+  priceDisplay: string | null;
   icon: string;
   category: string;
   tab: string;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  currency_type: 'flux' | 'iap';
-  iap_product_id: string | null;
-  sort_order: number;
+  currencyType: 'flux' | 'iap';
+  iapProductId: string | null;
+  sortOrder: number;
 }
 
 interface UserStats {
@@ -60,11 +60,11 @@ interface UserStats {
 }
 
 interface EquippedSlots {
-  skin: { item_id: string; item: StoreItem } | null;
-  trail: { item_id: string; item: StoreItem } | null;
-  theme: { item_id: string; item: StoreItem } | null;
-  gravity_effect: { item_id: string; item: StoreItem } | null;
-  death_effect: { item_id: string; item: StoreItem } | null;
+  skin: { itemId: string; item: StoreItem } | null;
+  trail: { itemId: string; item: StoreItem } | null;
+  theme: { itemId: string; item: StoreItem } | null;
+  gravity_effect: { itemId: string; item: StoreItem } | null;
+  death_effect: { itemId: string; item: StoreItem } | null;
 }
 
 interface DailyStreak {
@@ -427,9 +427,9 @@ function ItemCard({
 }) {
   const textColor = theme.dark ? '#ffffff' : '#000000';
   const secondaryColor = theme.dark ? '#98989D' : '#666666';
-  const isIAP = item.currency_type === 'iap';
+  const isIAP = item.currencyType === 'iap';
   const priceLabel = isIAP
-    ? (item.price_display || `$${(Number(item.price) / 100).toFixed(2)}`)
+    ? (item.priceDisplay || `$${(Number(item.price) / 100).toFixed(2)}`)
     : `${formatFlux(item.price)} Flux`;
 
   const btnLabel = isEquipped ? 'EQUIPPED' : isOwned ? 'EQUIP' : priceLabel;
@@ -555,7 +555,7 @@ function FluxPackCard({
 }) {
   const textColor = theme.dark ? '#ffffff' : '#000000';
   const secondaryColor = theme.dark ? '#98989D' : '#666666';
-  const priceLabel = item.price_display || `$${(Number(item.price) / 100).toFixed(2)}`;
+  const priceLabel = item.priceDisplay || `$${(Number(item.price) / 100).toFixed(2)}`;
   const fluxMatch = item.name.match(/\d[\d,]*/);
   const fluxAmount = fluxMatch ? fluxMatch[0] : '???';
 
@@ -1188,12 +1188,12 @@ export default function StoreScreen() {
   }, [loadAll]);
 
   async function handlePurchase(item: StoreItem) {
-    console.log('[Store] handlePurchase called for:', item.id, item.name, 'currency:', item.currency_type);
+    console.log('[Store] handlePurchase called for:', item.id, item.name, 'currency:', item.currencyType);
     if (!user) {
       showInfo('Sign In Required', 'Sign in to purchase items from the store.');
       return;
     }
-    if (item.currency_type === 'flux') {
+    if (item.currencyType === 'flux') {
       const balance = userStats?.totalCoins ?? 0;
       if (balance < item.price) {
         const needed = item.price - balance;
@@ -1215,7 +1215,7 @@ export default function StoreScreen() {
       }
     } else {
       // IAP — placeholder
-      console.log('[Store] IAP purchase initiated for:', item.iap_product_id);
+      console.log('[Store] IAP purchase initiated for:', item.iapProductId);
       showInfo('Coming Soon', 'In-app purchases will be available soon!');
     }
   }
@@ -1232,7 +1232,7 @@ export default function StoreScreen() {
       console.log('[Store] Equip success, slot:', slot, 'item:', item.id);
       setEquipped((prev) => ({
         ...prev,
-        [slot]: { item_id: item.id, item },
+        [slot]: { itemId: item.id, item },
       }));
     } catch (e: any) {
       console.error('[Store] Equip failed:', e);
@@ -1268,7 +1268,7 @@ export default function StoreScreen() {
 
   function isItemEquipped(item: StoreItem): boolean {
     const slot = categoryToSlot(item.category) as keyof EquippedSlots;
-    return equipped[slot]?.item_id === item.id;
+    return equipped[slot]?.itemId === item.id;
   }
 
   // ─── Tab content ────────────────────────────────────────────────────────────
@@ -1278,7 +1278,7 @@ export default function StoreScreen() {
     if (activeTab === 'Trails') return i.tab === 'trails';
     if (activeTab === 'Themes') return i.tab === 'themes';
     if (activeTab === 'Effects') return i.tab === 'effects';
-    if (activeTab === 'Premium') return i.tab === 'premium' || i.currency_type === 'iap';
+    if (activeTab === 'Premium') return i.tab === 'premium' || i.currencyType === 'iap';
     return false;
   });
 
@@ -1559,11 +1559,11 @@ export default function StoreScreen() {
               const discountItem = items[Math.floor(items.length / 2)];
               const discountPct = 30;
               const discountedPrice = Math.floor(discountItem.price * (1 - discountPct / 100));
-              const discountedDisplay = discountItem.currency_type === 'iap'
+              const discountedDisplay = discountItem.currencyType === 'iap'
                 ? `$${(discountedPrice / 100).toFixed(2)}`
                 : `${formatFlux(discountedPrice)} Flux`;
-              const originalDisplay = discountItem.currency_type === 'iap'
-                ? (discountItem.price_display || `$${(Number(discountItem.price) / 100).toFixed(2)}`)
+              const originalDisplay = discountItem.currencyType === 'iap'
+                ? (discountItem.priceDisplay || `$${(Number(discountItem.price) / 100).toFixed(2)}`)
                 : `${formatFlux(discountItem.price)} Flux`;
               return (
                 <GlassView
