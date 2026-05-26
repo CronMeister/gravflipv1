@@ -68,31 +68,28 @@ export const userStats = pgTable('user_stats', {
   index('idx_user_stats_weekly_score').on(table.weeklyScore),
 ]);
 
-export const dailyObjectives = pgTable('daily_objectives', {
+export const objectives = pgTable('objectives', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: text('title').notNull(),
   description: text('description').notNull(),
-  targetValue: integer('target_value').notNull(),
-  rewardCoins: integer('reward_coins').notNull(),
+  target_value: integer('target_value').notNull(),
+  reward_coins: integer('reward_coins').notNull(),
   icon: text('icon').notNull(),
-  date: timestamp('date', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  index('idx_daily_objectives_date').on(table.date),
-]);
+  kind: text('kind').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const userObjectives = pgTable('user_objectives', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
-  objectiveId: uuid('objective_id').notNull().references(() => dailyObjectives.id, { onDelete: 'cascade' }),
+  objective_id: uuid('objective_id').notNull().references(() => objectives.id, { onDelete: 'cascade' }),
   progress: integer('progress').notNull().default(0),
   completed: boolean('completed').notNull().default(false),
-  completedAt: timestamp('completed_at', { withTimezone: true }),
+  completed_at: timestamp('completed_at', { withTimezone: true }),
   date: timestamp('date', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  device_id: text('device_id').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  index('idx_user_objectives_user_id').on(table.userId),
-  index('idx_user_objectives_objective_id').on(table.objectiveId),
+  index('idx_user_objectives_objective_id').on(table.objective_id),
   index('idx_user_objectives_date').on(table.date),
-  index('idx_user_objectives_user_date').on(table.userId, table.date),
+  index('idx_user_objectives_device_date').on(table.device_id, table.date),
 ]);

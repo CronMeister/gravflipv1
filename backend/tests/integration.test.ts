@@ -44,6 +44,11 @@ describe("API Integration Tests", () => {
     expect(Array.isArray(purchases)).toBe(true);
   });
 
+  test("Get user purchases - unauthenticated", async () => {
+    const res = await api("/api/store/purchases");
+    await expectStatus(res, 401);
+  });
+
   test("Purchase item - missing itemId", async () => {
     const res = await authenticatedApi("/api/store/purchase", authToken, {
       method: "POST",
@@ -71,6 +76,15 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 404);
   });
 
+  test("Purchase item - unauthenticated", async () => {
+    const res = await api("/api/store/purchase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "00000000-0000-0000-0000-000000000000" }),
+    });
+    await expectStatus(res, 401);
+  });
+
   test("Purchase item - valid", async () => {
     if (!itemId) {
       return;
@@ -93,6 +107,11 @@ describe("API Integration Tests", () => {
     expect(data.theme).toBeDefined();
     expect(data.gravity_effect).toBeDefined();
     expect(data.death_effect).toBeDefined();
+  });
+
+  test("Get user equipped items - unauthenticated", async () => {
+    const res = await api("/api/store/equipped");
+    await expectStatus(res, 401);
   });
 
   // ============ Store - Equip (Authenticated) ============
@@ -147,6 +166,18 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 403);
   });
 
+  test("Equip item - unauthenticated", async () => {
+    const res = await api("/api/store/equip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId: "00000000-0000-0000-0000-000000000000",
+        slot: "skin",
+      }),
+    });
+    await expectStatus(res, 401);
+  });
+
   test("Equip item - valid", async () => {
     if (!itemId) {
       return;
@@ -169,6 +200,11 @@ describe("API Integration Tests", () => {
     expect(data.nextReward).toBeDefined();
   });
 
+  test("Get daily streak - unauthenticated", async () => {
+    const res = await api("/api/store/daily-streak");
+    await expectStatus(res, 401);
+  });
+
   // ============ Store - Claim Daily (Authenticated) ============
   test("Claim daily reward", async () => {
     const res = await authenticatedApi("/api/store/claim-daily", authToken, {
@@ -177,7 +213,14 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 200, 400);
   });
 
-  // ============ Leaderboard - Public ============
+  test("Claim daily reward - unauthenticated", async () => {
+    const res = await api("/api/store/claim-daily", {
+      method: "POST",
+    });
+    await expectStatus(res, 401);
+  });
+
+  // ============ Leaderboard - Weekly (Public) ============
   test("Get weekly leaderboard", async () => {
     const res = await api("/api/leaderboard/weekly");
     await expectStatus(res, 200);
@@ -185,6 +228,7 @@ describe("API Integration Tests", () => {
     expect(Array.isArray(data)).toBe(true);
   });
 
+  // ============ Leaderboard - All-Time (Public) ============
   test("Get all-time leaderboard", async () => {
     const res = await api("/api/leaderboard/alltime");
     await expectStatus(res, 200);
@@ -201,6 +245,11 @@ describe("API Integration Tests", () => {
     expect(data.alltimeRank).toBeDefined();
   });
 
+  test("Get user leaderboard position - unauthenticated", async () => {
+    const res = await api("/api/leaderboard/user");
+    await expectStatus(res, 401);
+  });
+
   // ============ Stats (Authenticated) ============
   test("Get user stats", async () => {
     const res = await authenticatedApi("/api/stats", authToken);
@@ -208,6 +257,11 @@ describe("API Integration Tests", () => {
     const data = await res.json();
     expect(data.userId).toBeDefined();
     expect(data.highScore).toBeDefined();
+  });
+
+  test("Get user stats - unauthenticated", async () => {
+    const res = await api("/api/stats");
+    await expectStatus(res, 401);
   });
 
   test("Update score - missing score", async () => {
@@ -219,6 +273,15 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 400);
   });
 
+  test("Update score - unauthenticated", async () => {
+    const res = await api("/api/stats/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score: 100 }),
+    });
+    await expectStatus(res, 401);
+  });
+
   test("Update score - valid", async () => {
     const res = await authenticatedApi("/api/stats/score", authToken, {
       method: "POST",
@@ -228,19 +291,27 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 200);
   });
 
-  // ============ Objectives (Authenticated) ============
+  // ============ Objectives - Daily (Public) ============
   test("Get daily objectives", async () => {
-    const res = await authenticatedApi("/api/objectives/daily", authToken);
+    const res = await api("/api/objectives/daily");
     await expectStatus(res, 200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
     if (data.length > 0) {
-      objectiveId = data[0].objective.id;
+      objectiveId = data[0].id;
     }
   });
 
-  test("Update objective progress - missing objectiveId", async () => {
-    const res = await authenticatedApi("/api/objectives/progress", authToken, {
+  // ============ Objectives - Progress (Public) ============
+  test("Get objectives progress", async () => {
+    const res = await api("/api/objectives/progress");
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  test("Update objective progress - missing objective_id", async () => {
+    const res = await api("/api/objectives/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ progress: 10 }),
@@ -252,89 +323,46 @@ describe("API Integration Tests", () => {
     if (!objectiveId) {
       return;
     }
-    const res = await authenticatedApi("/api/objectives/progress", authToken, {
+    const res = await api("/api/objectives/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ objectiveId }),
+      body: JSON.stringify({ objective_id: objectiveId }),
     });
     await expectStatus(res, 400);
   });
 
-  test("Update objective progress - invalid objectiveId format", async () => {
-    const res = await authenticatedApi("/api/objectives/progress", authToken, {
+  test("Update objective progress - invalid objective_id format", async () => {
+    const res = await api("/api/objectives/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        objectiveId: "invalid-uuid",
+        objective_id: "invalid-uuid",
         progress: 10,
       }),
     });
     await expectStatus(res, 400);
   });
 
-  test("Update objective progress - nonexistent objectiveId", async () => {
-    const res = await authenticatedApi("/api/objectives/progress", authToken, {
+  test("Update objective progress - nonexistent objective_id", async () => {
+    const res = await api("/api/objectives/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        objectiveId: "00000000-0000-0000-0000-000000000000",
+        objective_id: "00000000-0000-0000-0000-000000000000",
         progress: 10,
       }),
     });
-    await expectStatus(res, 404);
+    await expectStatus(res, 400);
   });
 
   test("Update objective progress - valid", async () => {
     if (!objectiveId) {
       return;
     }
-    const res = await authenticatedApi("/api/objectives/progress", authToken, {
+    const res = await api("/api/objectives/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ objectiveId, progress: 5 }),
-    });
-    await expectStatus(res, 200);
-  });
-
-  test("Complete objective - missing objectiveId", async () => {
-    const res = await authenticatedApi("/api/objectives/complete", authToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    await expectStatus(res, 400);
-  });
-
-  test("Complete objective - invalid objectiveId format", async () => {
-    const res = await authenticatedApi("/api/objectives/complete", authToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        objectiveId: "invalid-uuid",
-      }),
-    });
-    await expectStatus(res, 400);
-  });
-
-  test("Complete objective - nonexistent objectiveId", async () => {
-    const res = await authenticatedApi("/api/objectives/complete", authToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        objectiveId: "00000000-0000-0000-0000-000000000000",
-      }),
-    });
-    await expectStatus(res, 404);
-  });
-
-  test("Complete objective - valid", async () => {
-    if (!objectiveId) {
-      return;
-    }
-    const res = await authenticatedApi("/api/objectives/complete", authToken, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ objectiveId }),
+      body: JSON.stringify({ objective_id: objectiveId, progress: 5 }),
     });
     await expectStatus(res, 200);
   });
